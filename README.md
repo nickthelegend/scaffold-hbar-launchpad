@@ -252,7 +252,7 @@ yarn next:dev
 
 `Deploy.s.sol` picks the SaucerSwap V1 router for the chain (testnet `0.0.19264`, mainnet `0.0.3045981`) and reads the factory and WHBAR from it. A local Anvil chain is not supported, because it has no HTS or SaucerSwap; use testnet, or the forked test suite, for development.
 
-**Hosting the frontend**: it is a standard Next.js app. On Railway or Vercel set the root directory to `packages/nextjs` (or use the root `yarn next:build` / `yarn next:serve`), and set the env vars above. `HEDERA_OPERATOR_KEY` must only be set as a server secret.
+**Hosting the frontend.** It is a standard Next.js app, and [`railway.json`](railway.json) makes it one-click on Railway: create a service from your repo, add the env vars above (`HEDERA_OPERATOR_KEY` as a secret), and it builds with `yarn next:build` and serves with `yarn next:serve`. On Vercel, set the root directory to `packages/nextjs`.
 
 ## Testing
 

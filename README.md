@@ -8,6 +8,8 @@ npm create scaffold-hbar@latest -- --template nickthelegend/scaffold-hbar-launch
 
 | | |
 |---|---|
+| **Live demo** | [web-production-aca4c.up.railway.app](https://web-production-aca4c.up.railway.app) (Hedera testnet) |
+| **Demo video** | [82-second walkthrough](https://github.com/nickthelegend/scaffold-hbar-launchpad/releases/download/v1.0.0/hbar-launchpad-demo.mp4) |
 | **Hedera services** | HTS (contract-created token, freeze key as an anti-sniping guard) · Exchange Rate system contract · HIP-719 association · HCS · Mirror Node REST |
 | **Ecosystem integration** | SaucerSwap V1: pool creation, liquidity seeding and locking, post-graduation swaps and quotes |
 | **Stack** | Foundry · Next.js App Router · RainbowKit/wagmi/viem · Yarn workspaces · Node ≥ 20.18.3 |

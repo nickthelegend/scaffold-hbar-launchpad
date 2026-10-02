@@ -1,0 +1,15 @@
+{
+  "name": "launchpad-yarn",
+  "description": "Commands every change must pass. Contract tests run against real SaucerSwap on a Hedera testnet fork; frontend integration tests read the live testnet mirror node.",
+  "requiresNoSecrets": true,
+  "forbiddenCommands": ["npm install", "npm run", "pnpm install", "pnpm run"],
+  "commands": [
+    { "name": "install", "command": "yarn install", "timeoutMs": 600000, "purpose": "Install workspace dependencies." },
+    { "name": "contract-tests", "command": "yarn foundry:test", "timeoutMs": 600000, "purpose": "Launchpad + bonding-curve tests with the offline HTS emulator." },
+    { "name": "contract-lint", "command": "yarn foundry:lint", "timeoutMs": 180000, "purpose": "forge fmt --check and prettier on scripts." },
+    { "name": "frontend-tests", "command": "yarn next:test", "timeoutMs": 300000, "purpose": "Vitest: curve maths, candles, mirror client, comment signing." },
+    { "name": "frontend-lint", "command": "yarn next:lint --max-warnings=0", "timeoutMs": 300000, "purpose": "ESLint (next/core-web-vitals + prettier)." },
+    { "name": "types", "command": "yarn next:check-types", "timeoutMs": 300000, "purpose": "TypeScript against generated contract types." },
+    { "name": "build", "command": "yarn next:build", "timeoutMs": 900000, "purpose": "Production build." }
+  ]
+}

@@ -1,0 +1,24 @@
+name: launchpad-smoke
+server:
+  command: yarn next:dev
+  url: http://localhost:3000
+  timeoutMs: 300000
+defaults:
+  timeoutMs: 120000
+  hydrationTimeoutMs: 90000
+  minBodyTextLength: 40
+  failOnConsoleError: false
+routes:
+  - name: launches
+    path: /
+  - name: create
+    path: /create
+  - name: unknown-token
+    path: /token/0x0000000000000000000000000000000000000001
+  - name: debug-contracts
+    path: /debug
+forbidden:
+  visibleText:
+    - "Application error"
+    - "Unhandled Runtime Error"
+    - "No Launchpad deployment found"

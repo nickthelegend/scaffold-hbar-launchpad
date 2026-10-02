@@ -1,0 +1,69 @@
+{
+  "name": "launchpad",
+  "description": "Fair-launch HTS tokens on a bonding curve and graduate them into a SaucerSwap V1 pool with permanently locked liquidity. Foundry + Next.js, HCS comment threads, mirror-node charts.",
+  "version": "1.0.0",
+  "create-scaffold-hbar": {
+    "requirements": {
+      "node": ">=20.18.3",
+      "forge": ">=1.0.0"
+    },
+    "capabilities": {
+      "frontend": ["nextjs-app"],
+      "solidityFramework": ["foundry"],
+      "packageManager": ["yarn"]
+    },
+    "defaults": {
+      "frontend": "nextjs-app",
+      "solidityFramework": "foundry",
+      "packageManager": "yarn"
+    },
+    "outro": {
+      "sections": [
+        {
+          "steps": [
+            {
+              "text": "The frontend is pre-wired to a live Launchpad on Hedera testnet, so you can start trading right away. Deploy your own when you are ready."
+            }
+          ]
+        },
+        {
+          "title": "Try it",
+          "steps": [
+            {
+              "label": "Start the app (uses the shared testnet deployment)",
+              "command": "{run:next:dev}"
+            },
+            {
+              "label": "Get testnet HBAR for your wallet",
+              "url": "https://portal.hedera.com/faucet"
+            }
+          ]
+        },
+        {
+          "title": "Make it yours",
+          "steps": [
+            {
+              "label": "Run the contract tests (offline, HTS emulated)",
+              "command": "{run:foundry:test}"
+            },
+            {
+              "label": "Create a deployer keystore and fund it",
+              "command": "{run:foundry:account:generate}"
+            },
+            {
+              "label": "Deploy your Launchpad, wired to SaucerSwap",
+              "command": "{run:foundry:deploy} --network hedera_testnet"
+            },
+            {
+              "label": "Walk the full lifecycle on testnet and print HashScan links",
+              "command": "{run:foundry:demo} --graduate"
+            },
+            {
+              "text": "Optional: enable HCS comment threads with `{run:next:hcs:create-topic}` — see README → Comments."
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

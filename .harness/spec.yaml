@@ -1,0 +1,64 @@
+schemaVersion: 2
+
+name: launchpad
+description: >-
+  HTS token launchpad: bonding-curve fair launches that graduate into SaucerSwap V1 with locked liquidity,
+  mirror-node trade history and charts, and wallet-signed HCS comment threads.
+
+agent: claude
+
+baseline:
+  commands:
+    - name: install # required — also used for install fingerprinting
+      command: yarn install
+    - name: contracts
+      command: yarn foundry:test
+      timeoutMs: 600000
+    - name: build
+      command: yarn next:build
+      timeoutMs: 900000
+
+validators:
+  playwright: .harness/validators/playwright-smoke.yaml
+
+contract: .harness/acceptance-contract.json
+validator:
+  enabled: true
+
+# Template invariants every generated change must keep.
+requiredFiles:
+  - template.json
+  - packages/foundry/contracts/Launchpad.sol
+  - packages/foundry/contracts/libraries/BondingCurve.sol
+  - packages/nextjs/utils/launchpad/curve.ts
+
+forbiddenFiles:
+  - .env
+  - packages/foundry/.env
+  - packages/nextjs/.env
+  - packages/nextjs/.env.local
+
+secretScan:
+  failOnFiles:
+    - .env
+    - packages/foundry/.env
+    - packages/nextjs/.env.local
+  patterns:
+    - name: private-key-assignment
+      pattern: "(PRIVATE_KEY|OPERATOR_KEY)\\s*=\\s*(0x)?[0-9a-fA-F]{32,}"
+    - name: raw-hex-private-key
+      pattern: "['\"]0x[0-9a-fA-F]{64}['\"]"
+
+# Tier 3.5: an ephemeral funded testnet signer launches and trades through the burner wallet.
+# Needs ~45 HBAR per run (launch ≈ 33 HBAR incl. SaucerSwap's $2 pool fee). Export the operator vars first.
+chainValidation:
+  enabled: false
+  network: testnet
+  operator:
+    accountIdEnv: HEDERA_OPERATOR_ID
+    privateKeyEnv: HEDERA_OPERATOR_KEY
+  fundingHbar: 50
+  sweepBack: true
+  expose:
+    browserLocalStorageKey: burnerWallet.pk
+    envVars: []

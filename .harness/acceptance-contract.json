@@ -1,0 +1,67 @@
+{
+  "name": "launchpad-acceptance",
+  "description": "What a judge or user must be able to verify in the running app. Graded adversarially; fail on uncertainty.",
+  "assertions": [
+    {
+      "id": "C1",
+      "journey": "browse",
+      "route": "/",
+      "severity": "critical",
+      "statement": "The home page explains the launch → curve → SaucerSwap lifecycle and lists launches from the deployed Launchpad (or an empty state with a Create call to action) without a wallet.",
+      "howToVerify": "Open / with no wallet. Confirm the hero mentions SaucerSwap and the three steps, and that the 'Latest launches' section shows either cards with progress bars or the 'No launches yet' empty state. No error banner.",
+      "walletRequired": false,
+      "verifiableWithoutCredentials": true
+    },
+    {
+      "id": "C2",
+      "journey": "launch",
+      "route": "/create",
+      "severity": "critical",
+      "statement": "The create page shows a launch cost in HBAR read from quoteLaunchCost and disables submission until a wallet is connected and name and symbol are filled.",
+      "howToVerify": "Open /create. Confirm the 'Launch cost' row shows a number of HBAR (not '…' after loading), the explanation mentions the SaucerSwap pool fee and refunds, and the submit button reads 'Connect a wallet' and is disabled.",
+      "walletRequired": false,
+      "verifiableWithoutCredentials": true
+    },
+    {
+      "id": "C3",
+      "journey": "trade",
+      "route": "/token/[address]",
+      "severity": "critical",
+      "statement": "A token page shows market-cap chart, trades table, comment thread (or its enable instructions) and a trade panel: curve buy/sell before graduation, SaucerSwap swap after.",
+      "howToVerify": "From /, click a launch card (skip if none and mark as not applicable). Confirm the chart container titled 'Market cap (HBAR)', the 'Curve trades' table, a 'Thread' section or HCS enable notice, a graduation progress bar, and either Buy/Sell tabs or a 'Trade on SaucerSwap' panel.",
+      "walletRequired": false,
+      "verifiableWithoutCredentials": true
+    },
+    {
+      "id": "C4",
+      "journey": "trade",
+      "route": "/token/[address]",
+      "severity": "major",
+      "statement": "Entering an HBAR amount on the buy tab shows a live quote (tokens received and 1% fee) before any transaction is sent.",
+      "howToVerify": "On a non-graduated token page type 1 into 'You pay (HBAR)'. Within a few seconds rows 'You receive' and 'Fee (1%)' appear with non-zero values.",
+      "walletRequired": false,
+      "verifiableWithoutCredentials": true
+    },
+    {
+      "id": "C5",
+      "journey": "trade",
+      "route": "/token/[address]",
+      "severity": "major",
+      "statement": "A connected wallet can buy on the curve and the trade appears in the trades table from the mirror node.",
+      "howToVerify": "With the burner wallet funded, buy 1 HBAR on a non-graduated token. After confirmation and ~10s the trades table shows a new Buy row linking to HashScan.",
+      "walletRequired": true,
+      "verifiableWithoutCredentials": false,
+      "executableWithTestSigner": true
+    },
+    {
+      "id": "C6",
+      "journey": "robustness",
+      "route": "/token/0x0000000000000000000000000000000000000001",
+      "severity": "minor",
+      "statement": "An address that is not a launch shows a friendly not-found state instead of crashing.",
+      "howToVerify": "Open /token/0x0000000000000000000000000000000000000001 and confirm 'Launch not found' with a link back to launches.",
+      "walletRequired": false,
+      "verifiableWithoutCredentials": true
+    }
+  ]
+}

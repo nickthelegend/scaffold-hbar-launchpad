@@ -1,0 +1,43 @@
+{
+  "name": "launchpad-static",
+  "description": "Template invariants for the HBAR Launchpad: manifest, docs, package layout, no secrets, no Hardhat workspace.",
+  "jsonAssertions": [
+    { "file": "package.json", "path": "packageManager", "equals": "yarn@3.2.3" },
+    { "file": "template.json", "path": "name", "equals": "launchpad" },
+    { "file": "template.json", "path": "create-scaffold-hbar.capabilities.solidityFramework", "equals": ["foundry"] },
+    { "file": "template.json", "path": "create-scaffold-hbar.capabilities.frontend", "equals": ["nextjs-app"] }
+  ],
+  "fileAssertions": {
+    "required": [
+      "README.md",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "LICENCE",
+      "template.json",
+      "package.json",
+      "packages/foundry/package.json",
+      "packages/foundry/contracts/Launchpad.sol",
+      "packages/foundry/script/Deploy.s.sol",
+      "packages/foundry/test/Launchpad.t.sol",
+      "packages/nextjs/package.json",
+      "packages/nextjs/app/token/[address]/page.tsx",
+      "packages/nextjs/app/api/comments/route.ts",
+      "packages/nextjs/contracts/externalContracts.ts",
+      ".harness/spec.yaml",
+      ".harness/prd.md"
+    ],
+    "forbidden": [
+      ".env",
+      "packages/foundry/.env",
+      "packages/nextjs/.env",
+      "packages/nextjs/.env.local",
+      "packages/hardhat"
+    ]
+  },
+  "textAssertions": [
+    { "file": "README.md", "contains": ["yarn foundry:test", "yarn deploy --network hedera_testnet", "SaucerSwap", "hashscan.io/testnet"] },
+    { "file": "AGENTS.md", "contains": ["tinybars", "weibars", "yarn next:test"] },
+    { "file": "packages/foundry/contracts/Launchpad.sol", "contains": ["createFungibleToken", "addLiquidityETH", "tinycentsToTinybars"] },
+    { "file": "packages/nextjs/contracts/externalContracts.ts", "contains": ["SaucerSwapRouter"] }
+  ]
+}

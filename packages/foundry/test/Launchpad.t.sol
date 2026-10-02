@@ -8,9 +8,14 @@ import { IExchangeRate } from "../contracts/interfaces/IExchangeRate.sol";
 import {
     ISaucerSwapV1Factory,
     ISaucerSwapV1Pair,
-    ISaucerSwapV1Router
+    ISaucerSwapV1Router,
+    IWHBAR
 } from "../contracts/interfaces/ISaucerSwapV1.sol";
 import { ForkTestBase } from "./utils/ForkTestBase.sol";
+
+interface IHtsFreezeView {
+    function isFrozen(address token, address account) external view returns (int64 responseCode, bool frozen);
+}
 
 /// @notice Integration tests against the real SaucerSwap V1 deployment on a Hedera testnet fork.
 ///         No protocol mocks: pools are created by SaucerSwap's factory, liquidity goes through its router, LP tokens
@@ -163,6 +168,13 @@ contract LaunchpadTest is ForkTestBase {
         assertEq(launch.tokensLeft, launchpad.CURVE_SUPPLY() - tokensOut);
     }
 
+    function test_spotPrice_revertsAfterGraduation() public {
+        address token = _launch();
+        _buy(alice, token, 200 * HBAR);
+        vm.expectRevert(abi.encodeWithSelector(Launchpad.AlreadyGraduated.selector, token));
+        launchpad.spotPrice(token);
+    }
+
     function test_spotPrice_isScaledSoEarlyPricesAreNonZero() public {
         address token = _launch();
         // (threshold / 3) / (curveSupply * 4 / 3) at 100 HBAR is ~3.1 tinybars per token; at small thresholds it is < 1.
@@ -256,7 +268,6 @@ contract LaunchpadTest is ForkTestBase {
         assertApproxEqAbs(reserveToken, launchpad.LIQUIDITY_SUPPLY(), 1_000 * WHOLE_TOKEN);
         assertEq(IERC20(token).balanceOf(address(launchpad)), 0, "no supply left behind");
         assertGt(IERC20(launch.lpToken).balanceOf(address(launchpad)), 0, "LP held (locked) by the launchpad");
-        assertEq(IERC20(token).allowance(address(launchpad), address(ROUTER)), 0, "router consumed the allowance");
     }
 
     function test_graduation_poolOpensAtFinalCurvePrice() public {
@@ -303,20 +314,49 @@ contract LaunchpadTest is ForkTestBase {
         vm.stopPrank();
     }
 
-    function test_graduation_toleratesPreSeededPool() public {
+    function test_createLaunch_freezesPoolUntilGraduation() public {
+        address token = _launch();
+        address pair = launchpad.getLaunch(token).pair;
+        (, bool frozen) = IHtsFreezeView(HTS).isFrozen(token, pair);
+        assertTrue(frozen, "pool frozen at launch");
+
+        _buy(alice, token, 200 * HBAR);
+        (, frozen) = IHtsFreezeView(HTS).isFrozen(token, pair);
+        assertFalse(frozen, "pool unfrozen at graduation");
+    }
+
+    function test_frozenPool_cannotBeSeededBeforeGraduation() public {
         address token = _launch();
         uint256 bought = _buy(alice, token, 10 * HBAR);
+        address pair = launchpad.getLaunch(token).pair;
 
-        // An attacker seeds the empty pair at a skewed price before graduation, through SaucerSwap's own router.
+        // Through SaucerSwap's router: the router's HTS transfer into the frozen pair fails.
         vm.startPrank(alice);
         IERC20(token).approve(address(ROUTER), bought);
+        vm.expectRevert();
         ROUTER.addLiquidityETH{ value: HBAR }(token, bought, 0, 0, alice, block.timestamp + 60);
+
+        // Directly through the token's ERC-20 facade.
+        vm.expectRevert();
+        IERC20(token).transfer(pair, bought);
         vm.stopPrank();
+    }
+
+    function test_graduation_ignoresWhbarDonatedToPool() public {
+        address token = _launch();
+        address pair = launchpad.getLaunch(token).pair;
+
+        // Anyone can still send WHBAR to the pair (only the launch token is frozen). It must not block graduation.
+        vm.prank(alice);
+        IWHBAR(ROUTER.WHBAR()).deposit{ value: 5 * HBAR }(alice, pair);
 
         _buy(bob, token, 200 * HBAR);
 
         Launchpad.Launch memory launch = launchpad.getLaunch(token);
-        assertTrue(launch.graduated, "graduation must not brick");
+        assertTrue(launch.graduated);
+        (uint256 reserveToken, uint256 reserveHbar) = _reserves(pair, token);
+        assertEq(reserveHbar, THRESHOLD + 5 * HBAR, "donation stays in the pool, owned by the locked LP");
+        assertApproxEqAbs(reserveToken, launchpad.LIQUIDITY_SUPPLY(), 1_000 * WHOLE_TOKEN);
         assertGt(IERC20(launch.lpToken).balanceOf(address(launchpad)), 0);
     }
 

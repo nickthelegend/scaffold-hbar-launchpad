@@ -53,8 +53,9 @@ const CreatePage: NextPage = () => {
     <div className="max-w-xl w-full mx-auto px-5 py-10">
       <h1 className="text-3xl font-bold m-0">Launch a token</h1>
       <p className="text-base-content/70 mt-2">
-        Creates a fixed supply of 1,000,000,000 HTS tokens with no admin, supply, freeze or wipe keys, and its
-        SaucerSwap pool. Nobody, including you, gets tokens for free: buy on the curve like everyone else.
+        Creates a fixed supply of 1,000,000,000 HTS tokens with no admin, supply, wipe or pause keys, and its SaucerSwap
+        pool, frozen until graduation so nobody can seed it early. Nobody, including you, gets tokens for free: buy on
+        the curve like everyone else.
       </p>
 
       <form onSubmit={submit} className="bg-base-100 rounded-2xl border border-base-300 p-6 flex flex-col gap-4 mt-6">

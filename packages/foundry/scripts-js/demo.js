@@ -98,7 +98,7 @@ function loadLaunchpadAddress() {
 const MAX_GAS = ethers.BigNumber.from(15_000_000); // Hedera's per-transaction gas limit
 
 /**
- * Sends a tx with an estimated gas limit (+10%). Hedera bills at least 80% of the limit, and the relay rejects a tx
+ * Sends a tx with an estimated gas limit (+5%). Hedera bills at least 80% of the limit, and the relay rejects a tx
  * whose value + limit × price exceeds the balance, so the limit is also capped at what the signer can afford.
  */
 async function send(label, contract, method, args, overrides = {}) {
@@ -175,6 +175,10 @@ async function main() {
       }
     })
     .find((event) => event?.name === "LaunchCreated");
+  if (!created)
+    throw new Error(
+      "createLaunch succeeded but emitted no LaunchCreated event"
+    );
   const token = created.args.token;
   console.log(
     `    token ${toEntityId(token)} → ${HASHSCAN}/token/${toEntityId(token)}`

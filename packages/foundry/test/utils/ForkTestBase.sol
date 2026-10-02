@@ -43,7 +43,10 @@ abstract contract ForkTestBase is Test {
         string[] memory curl = new string[](3);
         curl[0] = "curl";
         curl[1] = "-s";
-        curl[2] = "https://testnet.mirrornode.hedera.com/api/v1/network/exchangerate";
+        // The rate in force at the fork block, so runs are reproducible.
+        curl[2] = string.concat(
+            "https://testnet.mirrornode.hedera.com/api/v1/network/exchangerate?timestamp=", vm.toString(block.timestamp)
+        );
         string memory json = string(vm.ffi(curl));
         LiveExchangeRate(EXCHANGE_RATE)
             .setRate(

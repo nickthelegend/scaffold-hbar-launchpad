@@ -8,9 +8,11 @@ import { IHederaTokenService } from "hedera-forking/IHederaTokenService.sol";
 import { KeyLib } from "hedera-forking/KeyLib.sol";
 
 import { ContractKeys } from "./ContractKeys.sol";
+import { HtsFreeze } from "./HtsFreeze.sol";
 
-/// @notice hedera-forking's HTS emulator plus the HTS v1 ABI still used by contracts compiled before HIP-206's
-///         `int64` revision — notably SaucerSwap V1, deployed in 2022.
+/// @notice hedera-forking's HTS emulator plus what the pinned version lacks for this template: the HTS v1 ABI still
+///         used by contracts compiled before HIP-206's `int64` revision (notably SaucerSwap V1, deployed in 2022), and
+///         freeze / unfreeze (enforced on transfers by `HtsContractKeyRouter`).
 /// @dev The network keeps serving both ABIs; the pinned emulator only implements v2. Each v1 entry point converts its
 ///      arguments and re-dispatches to the v2 implementation with `delegatecall`, so `msg.sender` (and therefore
 ///      treasury and supply-key checks) is preserved. v1 and v2 return values encode identically for valid values.
@@ -96,5 +98,33 @@ contract HtsV1Compat is HtsSystemContractJson {
             case 0 { revert(add(result, 32), mload(result)) }
             default { return(add(result, 32), mload(result)) }
         }
+    }
+
+    function freezeToken(address token, address account) external returns (int64) {
+        return _setFrozen(token, account, true);
+    }
+
+    function unfreezeToken(address token, address account) external returns (int64) {
+        return _setFrozen(token, account, false);
+    }
+
+    function isFrozen(address token, address account) external view returns (int64, bool) {
+        return (HederaResponseCodes.SUCCESS, uint256(ContractKeys.vm.load(token, HtsFreeze.slot(account))) == 1);
+    }
+
+    /// Only the token's freeze key may (un)freeze; here, a contract key matching the caller.
+    function _setFrozen(address token, address account, bool frozen) private returns (int64) {
+        (, TokenInfo memory info) = IHederaTokenService(token).getTokenInfo(token);
+        bool hasFreezeKey;
+        for (uint256 i = 0; i < info.token.tokenKeys.length; i++) {
+            IHederaTokenService.TokenKey memory key = info.token.tokenKeys[i];
+            if (key.keyType & HtsFreeze.FREEZE_KEY_TYPE == 0) continue;
+            hasFreezeKey = true;
+            if (key.key.contractId == msg.sender) {
+                ContractKeys.vm.store(token, HtsFreeze.slot(account), bytes32(uint256(frozen ? 1 : 0)));
+                return HederaResponseCodes.SUCCESS;
+            }
+        }
+        return hasFreezeKey ? HtsFreeze.INVALID_SIGNATURE : HtsFreeze.TOKEN_HAS_NO_FREEZE_KEY;
     }
 }

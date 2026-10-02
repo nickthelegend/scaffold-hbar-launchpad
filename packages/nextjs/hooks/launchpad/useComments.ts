@@ -2,14 +2,13 @@ import { useLaunchpad } from "./useLaunchpad";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Address } from "viem";
 import { useAccount, useSignMessage } from "wagmi";
-import { commentSigningMessage, decodeTopicComments } from "~~/utils/launchpad/comments";
-import { MIRROR_NODE_URLS } from "~~/utils/launchpad/mirror";
+import { commentSigningMessage, verifiedComments } from "~~/utils/launchpad/comments";
 
 const TOPIC_ID = process.env.NEXT_PUBLIC_HCS_TOPIC_ID;
 
 /** Reads a token's comment thread from HCS (via the mirror node) and posts wallet-signed comments. */
 export function useComments(token: Address) {
-  const { chainId } = useLaunchpad();
+  const { chainId, mirror } = useLaunchpad();
   const { address: author } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const queryClient = useQueryClient();
@@ -19,18 +18,13 @@ export function useComments(token: Address) {
     queryKey,
     enabled: Boolean(TOPIC_ID),
     refetchInterval: 10_000,
-    queryFn: async () => {
-      const res = await fetch(`${MIRROR_NODE_URLS[chainId]}/api/v1/topics/${TOPIC_ID}/messages?order=desc&limit=100`);
-      if (!res.ok) throw new Error(`Mirror node returned ${res.status}`);
-      const { messages } = await res.json();
-      return decodeTopicComments(messages, token);
-    },
+    queryFn: async () => verifiedComments(await mirror.getTopicMessages(TOPIC_ID!), token),
   });
 
   const post = useMutation({
-    mutationFn: async (text: string) => {
+    mutationFn: async (rawText: string) => {
       if (!author) throw new Error("Connect a wallet to comment");
-      const payload = { token, author, text, signedAt: Math.floor(Date.now() / 1000) };
+      const payload = { token, author, text: rawText.trim(), signedAt: Math.floor(Date.now() / 1000) };
       const signature = await signMessageAsync({ message: commentSigningMessage(payload) });
       const res = await fetch("/api/comments", {
         method: "POST",

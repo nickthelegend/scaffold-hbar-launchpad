@@ -11,7 +11,10 @@ import { formatHbar } from "~~/utils/launchpad/units";
 const PAGE_SIZE = 30n;
 
 const steps = [
-  ["Launch", "Mint a fixed-supply HTS token with no admin keys. Its SaucerSwap pool is created in the same tx."],
+  [
+    "Launch",
+    "Mint a fixed-supply HTS token with no mint or admin keys. Its SaucerSwap pool is created, and frozen, in the same tx.",
+  ],
   ["Trade the curve", "80% of supply sells on a bonding curve priced in HBAR. Buy or sell any time."],
   ["Graduate", "At the threshold, raised HBAR + 20% of supply seed SaucerSwap. LP tokens are locked forever."],
 ] as const;

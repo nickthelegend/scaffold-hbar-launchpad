@@ -11,15 +11,17 @@ import {
 } from "lightweight-charts";
 import { useTheme } from "next-themes";
 import { type PricePoint, pickInterval, toCandles } from "~~/utils/launchpad/candles";
+import { TOTAL_SUPPLY } from "~~/utils/launchpad/curve";
+import { WHOLE_TOKEN } from "~~/utils/launchpad/units";
 
-/** Whole tokens in supply; multiplying the per-token price gives a readable market-cap series. */
-const SUPPLY_WHOLE_TOKENS = 1_000_000_000;
+/** Per-token prices are tiny (~1e-8 HBAR); multiplying by the supply gives a readable market-cap series. */
+const SUPPLY_WHOLE_TOKENS = Number(TOTAL_SUPPLY / WHOLE_TOKEN);
 
 /**
  * Candlestick chart of market cap (HBAR) built from mirror-node history: bonding-curve trades
  * followed by SaucerSwap pool updates after graduation.
  */
-export const PriceChart = ({ points }: { points: PricePoint[] }) => {
+export const MarketCapChart = ({ points }: { points: PricePoint[] }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);

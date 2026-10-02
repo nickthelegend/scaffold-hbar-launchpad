@@ -1,3 +1,4 @@
+import type { MirrorTopicMessage } from "./comments";
 import { type Address, type Hex, decodeEventLog, parseAbi, toEventSelector } from "viem";
 
 /**
@@ -147,8 +148,9 @@ export class MirrorNodeClient {
   }
 
   /**
-   * Whether `account` can receive `token` right now: either already associated, or it has
-   * unlimited / free automatic association slots (HIP-904). Returns `null` if the account does not exist yet.
+   * Whether `account` can receive `token` right now: either already associated, or it has unlimited
+   * (`-1`, the default for wallet-created accounts since HIP-904) or still-unused automatic association slots.
+   * Returns `null` if the account does not exist yet.
    */
   async getAssociationStatus(
     account: Address,
@@ -159,13 +161,28 @@ export class MirrorNodeClient {
       { allowNotFound: true },
     );
     if (!accountRes) return null;
-    const relationships = await this.get<{ tokens: { token_id: string }[] }>(
+    const relationship = await this.get<{ tokens: { token_id: string }[] }>(
       `/api/v1/accounts/${account}/tokens?token.id=${toEntityId(token)}`,
     );
-    return {
-      associated: relationships.tokens.length > 0,
-      autoAssociates: accountRes.max_automatic_token_associations !== 0,
-    };
+    const maxSlots = accountRes.max_automatic_token_associations;
+    let autoAssociates = maxSlots === -1;
+    if (maxSlots > 0) {
+      const tokens = await this.getAll<{ automatic_association: boolean }>(
+        `/api/v1/accounts/${account}/tokens?limit=100`,
+        "tokens",
+      );
+      autoAssociates = tokens.filter(t => t.automatic_association).length < maxSlots;
+    }
+    return { associated: relationship.tokens.length > 0, autoAssociates };
+  }
+
+  /** Messages on an HCS topic, newest first, following pagination up to `maxPages` pages of 100. */
+  async getTopicMessages(topicId: string, maxPages = 10): Promise<MirrorTopicMessage[]> {
+    return this.getAll<MirrorTopicMessage>(
+      `/api/v1/topics/${topicId}/messages?order=desc&limit=100`,
+      "messages",
+      maxPages,
+    );
   }
 
   /** Fetches logs, splitting the range into 7-day windows when filtering by topic, and following pagination. */
@@ -190,6 +207,18 @@ export class MirrorNodeClient {
       }
     }
     return logs;
+  }
+
+  /** Follows `links.next` and concatenates the array at `key` across pages. */
+  private async getAll<T>(path: string, key: string, maxPages = Infinity): Promise<T[]> {
+    const items: T[] = [];
+    let next: string | null = path;
+    for (let page = 0; next && page < maxPages; page++) {
+      const body: Record<string, unknown> & { links?: { next: string | null } } = await this.get(next);
+      items.push(...((body[key] as T[]) ?? []));
+      next = body.links?.next ?? null;
+    }
+    return items;
   }
 
   private async get<T>(path: string, options: { allowNotFound?: boolean } = {}): Promise<T> {

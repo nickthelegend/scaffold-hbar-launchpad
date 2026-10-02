@@ -9,21 +9,24 @@ import { IHederaTokenService } from "hedera-forking/IHederaTokenService.sol";
 import { HederaResponseCodes } from "hedera-forking/HederaResponseCodes.sol";
 
 import { IExchangeRate } from "./interfaces/IExchangeRate.sol";
-import { ISaucerSwapV1Factory, ISaucerSwapV1Pair, ISaucerSwapV1Router } from "./interfaces/ISaucerSwapV1.sol";
+import { IHtsFreeze } from "./interfaces/IHtsFreeze.sol";
+import { ISaucerSwapV1Factory, ISaucerSwapV1Pair, ISaucerSwapV1Router, IWHBAR } from "./interfaces/ISaucerSwapV1.sol";
 import { BondingCurve } from "./libraries/BondingCurve.sol";
 
 /// @title Launchpad
 /// @notice Fair-launch HTS tokens on a bonding curve, then graduate them into a SaucerSwap V1 pool.
 ///
 /// Lifecycle of a launch:
-///  1. `createLaunch` mints a fixed-supply HTS token with no admin, supply, freeze, wipe or pause keys
-///     (nobody — including this contract — can ever mint more or confiscate balances). This contract is
-///     the treasury. The SaucerSwap token/WHBAR pair is created in the same transaction so its HTS LP
-///     token can be associated up front.
-///  2. `buy` / `sell` trade against a constant-product curve priced in HBAR. 80% of supply is sold here.
-///  3. When `graduationThreshold` HBAR has been raised, the raised HBAR plus the remaining 20% of supply
-///     are deposited into the SaucerSwap pool. The LP tokens are held by this contract, which has no
-///     function to move them: liquidity is locked forever. Trading continues on SaucerSwap.
+///  1. `createLaunch` mints a fixed-supply HTS token with no admin, supply, wipe, pause or KYC keys, so nobody —
+///     including this contract — can ever mint more or confiscate balances. Its only key is a freeze key held by
+///     this contract, used for one thing (see 2). The SaucerSwap token/WHBAR pair is created in the same
+///     transaction so its HTS LP token can be associated up front.
+///  2. The pair's token account is frozen until graduation. Nobody can seed the pool at a skewed price or trade it
+///     early, which would otherwise let an attacker capture part of the liquidity added at graduation.
+///  3. `buy` / `sell` trade against a constant-product curve priced in HBAR. 80% of supply is sold here.
+///  4. When `graduationThreshold` HBAR has been raised, the pair is unfrozen and the raised HBAR plus the remaining
+///     20% of supply are deposited into it. The LP tokens are held by this contract, which has no function to move
+///     them: liquidity is locked forever. Trading continues on SaucerSwap.
 ///
 /// @dev Hedera specifics worth knowing when reading this contract:
 ///  - Inside the EVM, HBAR amounts (`msg.value`, balances) are in tinybars (8 decimals), not weibars.
@@ -46,6 +49,8 @@ contract Launchpad is ReentrancyGuard {
 
     address internal constant HTS = address(0x167);
     address internal constant EXCHANGE_RATE = address(0x168);
+    /// HTS key type bit for the freeze key (bit 2).
+    uint256 internal constant FREEZE_KEY_TYPE = 4;
 
     uint8 public constant DECIMALS = 8;
     uint256 public constant TOTAL_SUPPLY = 1_000_000_000 * 10 ** DECIMALS;
@@ -61,13 +66,15 @@ contract Launchpad is ReentrancyGuard {
     /// A contract-initiated fungible token create costs ~$1.13 on testnet; HTS only charges the actual fee and the
     /// unused part is refunded to the creator, so this only needs to cover the fee plus some headroom.
     uint256 public constant TOKEN_CREATE_BUDGET_TINYCENTS = 1.3e10;
-    /// HTS auto-renew period for launched tokens (90 days, the network minimum).
+    /// HTS auto-renew period for launched tokens (90 days, the network default).
     int64 internal constant AUTO_RENEW_PERIOD = 7_776_000;
 
     ISaucerSwapV1Router public immutable router;
     ISaucerSwapV1Factory public immutable factory;
     /// HTS token address of WHBAR, the asset SaucerSwap pairs against.
     address public immutable whbar;
+    /// SaucerSwap's WHBAR wrapper contract, which mints `whbar` for HBAR.
+    IWHBAR public immutable whbarWrapper;
     address public immutable feeRecipient;
     /// Real HBAR (tinybars) a curve must raise to graduate.
     uint256 public immutable graduationThreshold;
@@ -109,7 +116,6 @@ contract Launchpad is ReentrancyGuard {
     error ZeroAmount();
     error SlippageExceeded(uint256 amountOut, uint256 minAmountOut);
     error HbarTransferFailed(address to, uint256 amount);
-    error UnexpectedHbarSender(address sender);
 
     constructor(ISaucerSwapV1Router router_, address feeRecipient_, uint256 graduationThreshold_) {
         // Below 3 tinybars the virtual HBAR reserve (threshold / 3) would be zero.
@@ -119,13 +125,9 @@ contract Launchpad is ReentrancyGuard {
         router = router_;
         factory = ISaucerSwapV1Factory(router_.factory());
         whbar = router_.whbar();
+        whbarWrapper = IWHBAR(router_.WHBAR());
         feeRecipient = feeRecipient_;
         graduationThreshold = graduationThreshold_;
-    }
-
-    /// @dev Only SaucerSwap refunds HBAR to this contract (unused liquidity amounts).
-    receive() external payable {
-        if (msg.sender != address(router)) revert UnexpectedHbarSender(msg.sender);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -245,9 +247,9 @@ contract Launchpad is ReentrancyGuard {
 
     /// @notice Curve spot price in tinybars per whole token (10^DECIMALS base units), scaled by `PRICE_SCALE`.
     /// @dev Early prices are below one tinybar per token, so an unscaled integer would round to zero.
+    ///      After graduation the price lives in the SaucerSwap pool, so this reverts with `AlreadyGraduated`.
     function spotPrice(address token) external view returns (uint256) {
-        Launch storage launch = _launches[token];
-        if (launch.creator == address(0)) revert UnknownLaunch(token);
+        Launch storage launch = _activeLaunch(token);
         return Math.mulDiv(_virtualHbar(launch), 10 ** DECIMALS * PRICE_SCALE, _virtualTokens(launch));
     }
 
@@ -292,6 +294,7 @@ contract Launchpad is ReentrancyGuard {
         address pair = factory.createPair{ value: pairCreateFee }(token, whbar);
         address lpToken = ISaucerSwapV1Pair(pair).lpToken();
         _checkHts(IHederaTokenService(HTS).associateToken(address(this), lpToken));
+        _checkHts(IHtsFreeze(HTS).freezeToken(token, pair));
 
         _tokens.push(token);
         _launches[token] = Launch({
@@ -315,8 +318,11 @@ contract Launchpad is ReentrancyGuard {
         hederaToken.treasury = address(this);
         hederaToken.tokenSupplyType = true; // FINITE
         hederaToken.maxSupply = int64(uint64(TOTAL_SUPPLY));
-        // No keys: the token can never be minted, frozen, wiped, paused or updated.
-        hederaToken.tokenKeys = new IHederaTokenService.TokenKey[](0);
+        // A single key: freeze, held by this contract, which only ever freezes the token's own pool (see `_graduate`).
+        // No admin, supply, wipe, pause or KYC key: the token can never be minted, wiped, paused or updated.
+        hederaToken.tokenKeys = new IHederaTokenService.TokenKey[](1);
+        hederaToken.tokenKeys[0].keyType = FREEZE_KEY_TYPE;
+        hederaToken.tokenKeys[0].key.contractId = address(this);
         hederaToken.expiry = IHederaTokenService.Expiry({
             second: 0, autoRenewAccount: address(this), autoRenewPeriod: AUTO_RENEW_PERIOD
         });
@@ -329,6 +335,9 @@ contract Launchpad is ReentrancyGuard {
     }
 
     /// @dev Moves the curve's HBAR and the reserved supply into SaucerSwap. LP tokens stay here forever.
+    ///      Liquidity is minted on the pair directly rather than through the router: the pair holds none of this token
+    ///      (its account was frozen), so the first mint sets the price from our amounts alone, and a WHBAR donation
+    ///      sitting in the pair cannot make the router's quote revert.
     function _graduate(address token, Launch storage launch) internal {
         launch.graduated = true;
         uint256 hbarLiquidity = launch.hbarRaised;
@@ -337,18 +346,13 @@ contract Launchpad is ReentrancyGuard {
         launch.hbarRaised = 0;
         launch.tokensLeft = 0;
 
-        // The router pulls exactly `tokenLiquidity` from an empty pool, consuming the allowance. Any remainder (pre-seeded
-        // pool) is unusable: the router only moves tokens from its caller, and only this contract calls it for this token.
-        IERC20(token).forceApprove(address(router), tokenLiquidity);
-        uint256 balanceBefore = address(this).balance - hbarLiquidity;
-        // The pair is empty unless someone seeded it before graduation; in that case the router adds at the
-        // pool's ratio and returns unused HBAR, which we credit to fees rather than let it sit unaccounted.
-        (uint256 tokenAdded, uint256 hbarAdded, uint256 lpTokens) = router.addLiquidityETH{ value: hbarLiquidity }(
-            token, tokenLiquidity, 0, 0, address(this), block.timestamp
-        );
-        accruedFees += address(this).balance - balanceBefore;
+        address pair = launch.pair;
+        _checkHts(IHtsFreeze(HTS).unfreezeToken(token, pair));
+        IERC20(token).safeTransfer(pair, tokenLiquidity);
+        whbarWrapper.deposit{ value: hbarLiquidity }(address(this), pair);
+        uint256 lpTokens = ISaucerSwapV1Pair(pair).mint(address(this));
 
-        emit Graduated(token, launch.pair, hbarAdded, tokenAdded, lpTokens);
+        emit Graduated(token, pair, hbarLiquidity, tokenLiquidity, lpTokens);
     }
 
     /// @dev Splits a buy's msg.value into curve input, fee and refund, capping input at the threshold.

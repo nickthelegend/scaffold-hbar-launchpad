@@ -8,7 +8,7 @@ npm create scaffold-hbar@latest -- --template nickthelegend/scaffold-hbar-launch
 
 | | |
 |---|---|
-| **Hedera services** | HTS (contract-created, keyless token) · Exchange Rate system contract · HIP-719 association · HCS · Mirror Node REST |
+| **Hedera services** | HTS (contract-created token, freeze key as an anti-sniping guard) · Exchange Rate system contract · HIP-719 association · HCS · Mirror Node REST |
 | **Ecosystem integration** | SaucerSwap V1: pool creation, liquidity seeding and locking, post-graduation swaps and quotes |
 | **Stack** | Foundry · Next.js App Router · RainbowKit/wagmi/viem · Yarn workspaces · Node ≥ 20.18.3 |
 | **Live on testnet** | Launchpad [`0.0.10831212`](https://hashscan.io/testnet/contract/0.0.10831212) · graduated token [`HCAT 0.0.10831221`](https://hashscan.io/testnet/token/0.0.10831221) · HCS topic [`0.0.10830947`](https://hashscan.io/testnet/topic/0.0.10830947) |
@@ -88,9 +88,10 @@ sequenceDiagram
 
     Creator->>LP: createLaunch(name, symbol, image, description) + HBAR
     LP->>FX: tinycentsToTinybars($1.30 budget, $2 pool fee)
-    LP->>HTS: createFungibleToken(1B supply, no keys, treasury = LP)
+    LP->>HTS: createFungibleToken(1B supply, only key = freeze held by LP, treasury = LP)
     LP->>SS: factory.createPair(token, WHBAR) — pays pool fee
     LP->>HTS: associateToken(LP, pair.lpToken())
+    LP->>HTS: freezeToken(token, pair) — nobody can seed the pool early
     LP-->>Creator: refund unused HBAR
 
     loop until threshold HBAR raised
@@ -99,7 +100,8 @@ sequenceDiagram
     end
 
     Trader->>LP: buy that crosses the threshold
-    LP->>SS: router.addLiquidityETH(threshold HBAR, 200M tokens, to = LP)
+    LP->>HTS: unfreezeToken(token, pair)
+    LP->>SS: transfer 200M tokens + WHBAR.deposit(threshold HBAR) → pair.mint(LP)
     Note over LP,SS: LP tokens stay in Launchpad — no function can move them
     Trader->>SS: swapExactETHForTokens / swapExactTokensForETH
 ```
@@ -124,7 +126,7 @@ A buy that would overshoot the threshold only spends what the curve needs and re
 
 | Service | Where | Why it is load-bearing |
 |---|---|---|
-| **HTS** via system contract `0x167` | `Launchpad._createHtsToken` | The token is a native HTS token created **by the contract** with **no admin/supply/freeze/wipe/pause keys** and a finite max supply. Supply is provably fixed and nobody can freeze holders. Native tokens show up in every Hedera wallet and explorer. |
+| **HTS** via system contract `0x167` | `Launchpad._createHtsToken` | The token is a native HTS token created **by the contract** with **no admin, supply, wipe, pause or KYC key** and a finite max supply. Its one key is a **freeze key held by the immutable Launchpad**, whose only use is freezing the token's own SaucerSwap pair until graduation, so nobody can pre-seed the pool at a skewed price and skim the graduation liquidity. Supply is provably fixed and nobody can freeze holders. Native tokens show up in every Hedera wallet and explorer. |
 | **Exchange Rate** system contract `0x168` | `Launchpad._launchCosts` | HTS and SaucerSwap price their fees in USD. The contract converts them to tinybars at execution time, so the launch quote is always right. |
 | **HIP-719 / HIP-904 association** | `associateToken` for the LP token; `useTokenAssociation` + `AssociationNotice` in the UI | Pairs, LP tokens and buyers must be associated. The Launchpad associates itself with the LP token at launch, and the UI detects accounts without free auto-association slots and offers one-click `token.associate()`. |
 | **HCS** | `app/api/comments`, `useComments` | Each token's comment thread is an ordered, timestamped, tamper-evident log on a consensus topic. Comments carry the author's wallet signature, so the relayer cannot forge them. |
@@ -287,10 +289,12 @@ The shared deployment the scaffolded frontend uses, with one token taken through
 | Step | Evidence |
 |---|---|
 | Launchpad deployed (graduation at 1 HBAR) | contract [`0.0.10831212`](https://hashscan.io/testnet/contract/0.0.10831212) · [deploy tx](https://hashscan.io/testnet/transaction/0x09dbe5c31e8f3c2d702b006b581b7e2b5ed406f3d306add9143c76f0bdfcacec) |
-| **Launch.** `createLaunch` creates the HTS token `HCAT` from the contract with no keys, creates its SaucerSwap pair through the factory (USD fee converted via `0x168`), associates the LP token, and refunds the unused HTS budget | [0x1b22…fd35](https://hashscan.io/testnet/transaction/0x1b2255778a8332000042b7735f170a1c15eab2fc2c982096c489b07458e7fd35) · token [`0.0.10831221`](https://hashscan.io/testnet/token/0.0.10831221) · pair [`0.0.10831222`](https://hashscan.io/testnet/contract/0.0.10831222) |
+| **Launch.** `createLaunch` creates the HTS token `HCAT` from the contract, creates its SaucerSwap pair through the factory (USD fee converted via `0x168`), associates the LP token, and refunds the unused HTS budget | [0x1b22…fd35](https://hashscan.io/testnet/transaction/0x1b2255778a8332000042b7735f170a1c15eab2fc2c982096c489b07458e7fd35) · token [`0.0.10831221`](https://hashscan.io/testnet/token/0.0.10831221) · pair [`0.0.10831222`](https://hashscan.io/testnet/contract/0.0.10831222) |
 | **Graduate.** A buy crosses the threshold; the overshoot is refunded; 1 HBAR plus 200M HCAT are deposited through SaucerSwap's router; 1.414e12 LP tokens are locked in the Launchpad | [0xc43f…c819](https://hashscan.io/testnet/transaction/0xc43f3969eedb4e5ecb674889eb537406b3901c8259eb96b702254a04cef6c819) · LP token [`0.0.10831223`](https://hashscan.io/testnet/token/0.0.10831223) |
 | **Trade on SaucerSwap.** `swapExactETHForTokens` against the new pool | [0x1e1a…fbe6](https://hashscan.io/testnet/transaction/0x1e1acba837fbcb828618fdf892bf22364a75d7acd6a803d2631d3ee361f7fbe6) |
 | **HCS comment.** A wallet-signed comment relayed to the comments topic | topic [`0.0.10830947`](https://hashscan.io/testnet/topic/0.0.10830947), message #1 |
+
+> **Note.** The shared deployment above was made just before the pool-freeze guard (see Security considerations) was added, so its HCAT pool was not frozen pre-graduation. The guard is exercised against real SaucerSwap in the fork tests (`test_createLaunch_freezesPoolUntilGraduation`, `test_frozenPool_cannotBeSeededBeforeGraduation`). `yarn deploy --network hedera_testnet` deploys the current contract.
 
 Curve `sell` with an HTS allowance, from an earlier development build (`0.0.10829745`): [buy](https://hashscan.io/testnet/transaction/0xec8809f667bd729aa3ea5518b7a79cfb713ca01f3ff24a9c13a435522675c06b) · [sell](https://hashscan.io/testnet/transaction/0x6bf0b18687f4463171f4d19aad0a299a03d2577738ccf4b390a298ae6830d670).
 
@@ -327,9 +331,9 @@ Live testing also caught two real bugs, both fixed and covered by tests:
 
 This is a template, **not audited software**. Notable design points:
 
-- **No admin.** The Launchpad has no owner, no pause and no upgrade path. Tokens have no keys. LP tokens can never leave the contract.
-- **Pre-seeded pools.** The pair exists from launch, so anyone holding tokens could add liquidity before graduation at a skewed price. Graduation then adds at the pool's ratio, credits unused HBAR to fees, and never reverts (`test_graduation_toleratesPreSeededPool`). If this matters for your product, gate it, for example with an HTS freeze key that is removed at graduation.
-- **Reentrancy.** All state-changing entry points are `nonReentrant` and update state before external calls. `receive()` only accepts HBAR from the SaucerSwap router.
+- **No admin.** The Launchpad has no owner, no pause and no upgrade path. Tokens have no admin, supply, wipe or pause key, so supply is fixed and balances cannot be confiscated. LP tokens can never leave the contract.
+- **Pool front-running.** Because the pair exists from launch, anyone holding tokens could otherwise add liquidity before graduation at a skewed price and capture part of the graduation liquidity. The Launchpad **freezes the pair's token account** (HTS freeze key, held only by the immutable contract) until graduation: the router and direct transfers into the pool both fail (`test_frozenPool_cannotBeSeededBeforeGraduation`). WHBAR can still be donated to the pair, but graduation mints directly on the pair, so a donation cannot block it and simply stays with the locked LP (`test_graduation_ignoresWhbarDonatedToPool`). The freeze key is held by code with no path to freeze anyone else.
+- **Reentrancy.** All state-changing entry points are `nonReentrant`. Trades update curve state before transferring tokens or HBAR. The contract has no `receive()`, so stray HBAR transfers are rejected.
 - **Slippage.** `buy`, `sell` and SaucerSwap swaps take minimum-out parameters; the UI uses 1%.
 - **Comment relayer.** The relayer can censor or delay comments but cannot forge them. Signatures expire after 5 minutes to limit replay. Smart-contract wallets (EIP-1271) are not supported by `verifyMessage` as written.
 - **Fees.** `withdrawFees()` is permissionless but always pays `feeRecipient`.

@@ -40,11 +40,6 @@ export function priceToHbar(price: bigint): number {
   return Number(price) / SCALED_TINYBARS_PER_HBAR;
 }
 
-/** Inverse of `priceToHbar` (float precision). */
-export function hbarToPrice(hbar: number): bigint {
-  return BigInt(Math.round(hbar * SCALED_TINYBARS_PER_HBAR));
-}
-
 /** Progress towards graduation in basis points (0–10000). */
 export function progressBps(threshold: bigint, hbarRaised: bigint): number {
   if (threshold === 0n) return 0;

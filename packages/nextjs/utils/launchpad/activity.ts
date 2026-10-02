@@ -20,14 +20,19 @@ export function toPricePoints(
     price: priceToHbar(spotPrice(threshold, trade)),
   }));
 
-  // Uniswap V2 orders pair tokens by address; the lower address is token0.
-  const tokenIsToken0 = BigInt(token) < BigInt(whbar);
-  const poolPoints = syncs.map(sync => {
-    const [reserveToken, reserveHbar] = tokenIsToken0 ? [sync.reserve0, sync.reserve1] : [sync.reserve1, sync.reserve0];
-    return { time: sync.timestamp, price: priceToHbar(poolPrice(reserveHbar, reserveToken)) };
-  });
+  const poolPoints = syncs.map(sync => ({
+    time: sync.timestamp,
+    price: priceToHbar(poolPriceAt(sync, token, whbar)),
+  }));
 
   return [...curvePoints, ...poolPoints].filter(point => point.price > 0);
+}
+
+/** Scaled pool price (see `PRICE_SCALE`) after a `Sync`. Uniswap V2 orders pair tokens by address: lower is token0. */
+export function poolPriceAt(sync: PoolSync, token: Address, whbar: Address): bigint {
+  const tokenIsToken0 = BigInt(token) < BigInt(whbar);
+  const [reserveToken, reserveHbar] = tokenIsToken0 ? [sync.reserve0, sync.reserve1] : [sync.reserve1, sync.reserve0];
+  return poolPrice(reserveHbar, reserveToken);
 }
 
 /** Sums buy and sell volume (tinybars) from curve trades. */

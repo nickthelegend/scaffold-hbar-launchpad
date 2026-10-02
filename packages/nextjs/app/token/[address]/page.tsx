@@ -9,7 +9,7 @@ import { CommentsThread } from "~~/components/launchpad/CommentsThread";
 import { CurveTradePanel } from "~~/components/launchpad/CurveTradePanel";
 import { GraduationProgress } from "~~/components/launchpad/GraduationProgress";
 import { HashscanLink } from "~~/components/launchpad/HashscanLink";
-import { PriceChart } from "~~/components/launchpad/PriceChart";
+import { MarketCapChart } from "~~/components/launchpad/MarketCapChart";
 import { SaucerSwapTradePanel } from "~~/components/launchpad/SaucerSwapTradePanel";
 import { TokenAvatar } from "~~/components/launchpad/TokenAvatar";
 import { TradesTable } from "~~/components/launchpad/TradesTable";
@@ -17,9 +17,13 @@ import { useLaunchActivity, useLaunchMetadata } from "~~/hooks/launchpad/useLaun
 import { useLaunchpad } from "~~/hooks/launchpad/useLaunchpad";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-hbar";
 import { curveVolume } from "~~/utils/launchpad/activity";
-import { hbarToPrice, marketCap, priceToHbar, spotPrice } from "~~/utils/launchpad/curve";
+import { marketCap, priceToHbar, spotPrice } from "~~/utils/launchpad/curve";
+import { hederaNetwork } from "~~/utils/launchpad/hashscan";
 import { toEntityId } from "~~/utils/launchpad/mirror";
 import { formatHbar } from "~~/utils/launchpad/units";
+
+/** The mirror node trails consensus by a few seconds. */
+const MIRROR_LAG_MS = 4_000;
 
 const TokenPage: NextPage = () => {
   const params = useParams<{ address: string }>();
@@ -32,9 +36,10 @@ const TokenPage: NextPage = () => {
     refetch: refetchLaunch,
   } = useScaffoldReadContract({ contractName: "Launchpad", functionName: "getLaunch", args: [token] });
   const { data: metadata } = useLaunchMetadata(token, launch?.createdAt);
-  const { data: activity, refetch: refetchActivity } = useLaunchActivity(token, launch);
+  const activity = useLaunchActivity(token, launch);
 
-  if (!token || error) {
+  // Only a definitive `UnknownLaunch` revert means "not found"; transient RPC errors keep the page loading.
+  if (!token || error?.message.includes("UnknownLaunch")) {
     return (
       <div className="max-w-xl mx-auto px-5 py-16 text-center">
         <h1 className="text-2xl font-bold">Launch not found</h1>
@@ -55,22 +60,13 @@ const TokenPage: NextPage = () => {
   }
 
   const symbol = metadata?.symbol ?? "TOKEN";
-  const lastPoint = activity?.pricePoints.at(-1);
-  // After graduation the curve is closed; the latest SaucerSwap pool price is the live price.
-  const price = launch.graduated
-    ? lastPoint
-      ? hbarToPrice(lastPoint.price)
-      : undefined
-    : spotPrice(threshold, launch);
+  // After graduation the curve is closed; the SaucerSwap pool price is the live price.
+  const price = launch.graduated ? activity.latestPoolPrice : spotPrice(threshold, launch);
   const onTrade = () => {
     refetchLaunch();
-    // The mirror node trails consensus by a few seconds.
-    setTimeout(() => refetchActivity(), 4_000);
+    setTimeout(() => activity.refetch(), MIRROR_LAG_MS);
   };
-  const saucerSwapUrl =
-    chainId === 295
-      ? `https://www.saucerswap.finance/swap/HBAR/${toEntityId(token)}`
-      : `https://testnet.saucerswap.finance/swap/HBAR/${toEntityId(token)}`;
+  const saucerSwapHost = hederaNetwork(chainId) === "mainnet" ? "www.saucerswap.finance" : "testnet.saucerswap.finance";
 
   return (
     <div className="max-w-6xl w-full mx-auto px-5 py-8 flex flex-col gap-6">
@@ -96,21 +92,24 @@ const TokenPage: NextPage = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Price" value={price !== undefined ? `${formatPrice(priceToHbar(price))} HBAR` : "—"} />
         <Stat label="Market cap" value={price !== undefined ? `${formatHbar(marketCap(price), 0)} HBAR` : "—"} />
-        <Stat label="Curve volume" value={activity ? `${formatHbar(curveVolume(activity.trades), 2)} HBAR` : "—"} />
-        <Stat label="Trades" value={activity ? String(activity.trades.length) : "—"} />
+        <Stat
+          label="Curve volume"
+          value={activity.trades ? `${formatHbar(curveVolume(activity.trades), 2)} HBAR` : "—"}
+        />
+        <Stat label="Curve trades" value={activity.trades ? String(activity.trades.length) : "—"} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 flex flex-col gap-6">
-          <PriceChart points={activity?.pricePoints ?? []} />
-          <TradesTable trades={activity?.trades ?? []} symbol={symbol} />
+          <MarketCapChart points={activity.pricePoints} />
+          <TradesTable trades={activity.trades ?? []} symbol={symbol} />
           <CommentsThread token={token} />
         </div>
 
         <aside className="flex flex-col gap-4 lg:sticky lg:top-4">
           <div className="bg-base-100 rounded-2xl border border-base-300 p-5">
             <GraduationProgress hbarRaised={launch.hbarRaised} threshold={threshold} graduated={launch.graduated} />
-            {activity?.graduation && (
+            {activity.graduation && (
               <p className="text-xs text-base-content/70 m-0 mt-2">
                 Seeded {formatHbar(activity.graduation.hbarLiquidity, 2)} HBAR of liquidity.{" "}
                 <HashscanLink path={`transaction/${activity.graduation.transactionHash}`} label="Graduation tx" />
@@ -120,7 +119,12 @@ const TokenPage: NextPage = () => {
           {launch.graduated ? (
             <>
               <SaucerSwapTradePanel token={token} symbol={symbol} whbar={whbar} onTrade={onTrade} />
-              <a href={saucerSwapUrl} target="_blank" rel="noreferrer" className="btn btn-outline btn-sm">
+              <a
+                href={`https://${saucerSwapHost}/swap/HBAR/${toEntityId(token)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-outline btn-sm"
+              >
                 Open in SaucerSwap
               </a>
             </>

@@ -1,4 +1,4 @@
-import { type Address, type Hex, getAddress, isAddress, isHex } from "viem";
+import { type Address, type Hex, getAddress, isAddress, isHex, verifyMessage } from "viem";
 
 /**
  * Token comment threads live on a Hedera Consensus Service (HCS) topic.
@@ -7,7 +7,8 @@ import { type Address, type Hex, getAddress, isAddress, isHex } from "viem";
  * signed off-chain with `personal_sign` and relayed by `/api/comments`, which pays the HCS fee.
  * The topic's submit key belongs to the relayer, but every message embeds the author's signature,
  * so anyone reading the topic from the mirror node can verify who wrote what — the relayer can
- * delay a comment, but never forge or alter one.
+ * delay or drop a comment, but never forge or alter one. Readers check every signature
+ * (`verifiedComments`), so a forged message on the topic is simply not displayed.
  */
 
 export const MAX_COMMENT_LENGTH = 280;
@@ -54,6 +55,8 @@ export function parseSignedComment(input: unknown, nowSeconds?: number): Validat
   if (typeof author !== "string" || !isAddress(author, { strict: false }))
     return { ok: false, error: "Invalid author address" };
   if (typeof text !== "string" || text.trim().length === 0) return { ok: false, error: "Comment is empty" };
+  // The signature covers the exact text, so surrounding whitespace is rejected rather than silently trimmed.
+  if (text !== text.trim()) return { ok: false, error: "Comment has leading or trailing whitespace" };
   if (text.length > MAX_COMMENT_LENGTH) return { ok: false, error: `Max ${MAX_COMMENT_LENGTH} characters` };
   if (typeof signedAt !== "number" || !Number.isInteger(signedAt)) return { ok: false, error: "Invalid signedAt" };
   if (typeof signature !== "string" || !isHex(signature)) return { ok: false, error: "Invalid signature" };
@@ -63,11 +66,27 @@ export function parseSignedComment(input: unknown, nowSeconds?: number): Validat
 
   return {
     ok: true,
-    comment: { token: getAddress(token), author: getAddress(author), text: text.trim(), signedAt, signature },
+    comment: { token: getAddress(token), author: getAddress(author), text, signedAt, signature },
   };
 }
 
-type MirrorTopicMessage = { message: string; sequence_number: number; consensus_timestamp: string };
+export type MirrorTopicMessage = { message: string; sequence_number: number; consensus_timestamp: string };
+
+/** True if `comment.signature` was produced by `comment.author` over the signing message. */
+export function isAuthentic(comment: SignedComment): Promise<boolean> {
+  return verifyMessage({
+    address: comment.author,
+    message: commentSigningMessage(comment),
+    signature: comment.signature,
+  }).catch(() => false);
+}
+
+/** Decodes topic messages for `token` and keeps only comments whose signature checks out. */
+export async function verifiedComments(messages: MirrorTopicMessage[], token: Address): Promise<TopicComment[]> {
+  const decoded = decodeTopicComments(messages, token);
+  const authentic = await Promise.all(decoded.map(isAuthentic));
+  return decoded.filter((_, i) => authentic[i]);
+}
 
 /** Decodes mirror node topic messages (base64 JSON), dropping anything malformed or for other tokens. */
 export function decodeTopicComments(messages: MirrorTopicMessage[], token: Address): TopicComment[] {

@@ -44,13 +44,6 @@ const saucerSwapRouterAbi = [
     ],
     outputs: [{ name: "amounts", type: "uint256[]" }],
   },
-  {
-    type: "function",
-    name: "whbar",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "address" }],
-  },
 ] as const;
 
 const externalContracts = {

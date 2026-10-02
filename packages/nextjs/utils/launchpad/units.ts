@@ -15,7 +15,6 @@ export const TOKEN_DECIMALS = 8;
 export const WHOLE_TOKEN = 10n ** BigInt(TOKEN_DECIMALS);
 
 export const tinybarsToWeibars = (tinybars: bigint): bigint => tinybars * WEIBARS_PER_TINYBAR;
-export const weibarsToTinybars = (weibars: bigint): bigint => weibars / WEIBARS_PER_TINYBAR;
 
 export const parseHbar = (hbar: string): bigint => parseUnits(hbar || "0", TINYBAR_DECIMALS);
 export const parseTokens = (amount: string): bigint => parseUnits(amount || "0", TOKEN_DECIMALS);

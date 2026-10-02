@@ -1,18 +1,10 @@
-import {
-  formatHbar,
-  formatTokens,
-  parseHbar,
-  tinybarsToWeibars,
-  tryParseAmount,
-  weibarsToTinybars,
-  withSlippage,
-} from "../units";
+import { formatHbar, formatTokens, parseHbar, tinybarsToWeibars, tryParseAmount, withSlippage } from "../units";
 import { describe, expect, it } from "vitest";
 
 describe("units", () => {
   it("converts between tinybars (EVM) and weibars (JSON-RPC)", () => {
     expect(tinybarsToWeibars(1n)).toBe(10n ** 10n);
-    expect(weibarsToTinybars(10n ** 18n)).toBe(10n ** 8n); // 1 HBAR
+    expect(tinybarsToWeibars(10n ** 8n)).toBe(10n ** 18n); // 1 HBAR
     expect(tinybarsToWeibars(parseHbar("2.5"))).toBe(25n * 10n ** 17n);
   });
 

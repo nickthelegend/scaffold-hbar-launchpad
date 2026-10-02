@@ -20,6 +20,9 @@ interface ISaucerSwapV1Pair {
     /// HTS fungible token representing pool shares (created by the pair itself on Hedera).
     function lpToken() external view returns (address);
 
+    /// Mints LP tokens to `to` for the token balances transferred in since the last update (Uniswap V2 semantics).
+    function mint(address to) external returns (uint256 liquidity);
+
     function token0() external view returns (address);
 
     function token1() external view returns (address);
@@ -50,13 +53,11 @@ interface ISaucerSwapV1Router {
         payable
         returns (uint256[] memory amounts);
 
-    function swapExactTokensForETH(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external returns (uint256[] memory amounts);
-
     function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
+}
+
+/// @notice SaucerSwap's WHBAR wrapper: wraps HBAR into the WHBAR HTS token.
+interface IWHBAR {
+    /// Wraps `msg.value` and sends the WHBAR tokens to `dst`.
+    function deposit(address src, address dst) external payable;
 }

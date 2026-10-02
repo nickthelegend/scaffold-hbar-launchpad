@@ -1,14 +1,14 @@
 import type { Address } from "viem";
 import { BlockieAvatar } from "~~/components/scaffold-hbar";
 import { useTargetNetwork } from "~~/hooks/scaffold-hbar";
+import { hashscanUrl } from "~~/utils/launchpad/hashscan";
 
 /** Compact avatar + short address linking to HashScan. Cheap enough for long lists (no account lookups). */
 export const AccountLabel = ({ address }: { address: Address }) => {
   const { targetNetwork } = useTargetNetwork();
-  const network = targetNetwork.id === 295 ? "mainnet" : "testnet";
   return (
     <a
-      href={`https://hashscan.io/${network}/account/${address}`}
+      href={hashscanUrl(targetNetwork.id, `account/${address}`)}
       target="_blank"
       rel="noreferrer"
       className="inline-flex items-center gap-2 link link-hover text-sm"

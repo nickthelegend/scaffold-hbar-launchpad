@@ -18,8 +18,9 @@ contract ForkMirrorNode is MirrorNode {
     function fetchAccount(string memory account) external override returns (string memory) {
         (uint256 status, bytes memory body) =
             Surl.get(string.concat(TESTNET_API, "accounts/", account, "?transactions=false"));
-        if (status == 200) return string(body);
-        return string.concat('{"evm_address":"', account, '"}');
+        if (status == 404) return string.concat('{"evm_address":"', account, '"}');
+        require(status == 200, string(body)); // surface rate limits and outages instead of inventing accounts
+        return string(body);
     }
 
     function fetchTokenData(address token) external override returns (string memory) {

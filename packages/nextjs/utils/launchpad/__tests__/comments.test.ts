@@ -1,4 +1,10 @@
-import { MAX_COMMENT_LENGTH, commentSigningMessage, decodeTopicComments, parseSignedComment } from "../comments";
+import {
+  MAX_COMMENT_LENGTH,
+  commentSigningMessage,
+  decodeTopicComments,
+  parseSignedComment,
+  verifiedComments,
+} from "../comments";
 import { verifyMessage } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it } from "vitest";
@@ -53,6 +59,15 @@ describe("comments", () => {
       ok: false,
     });
     expect(parseSignedComment(null)).toMatchObject({ ok: false });
+    // The signature covers the exact text, so padding is rejected instead of trimmed (which would break it).
+    expect(parseSignedComment({ ...comment, text: " gm " }, now)).toMatchObject({ ok: false });
+  });
+
+  it("drops forged comments when reading the topic", async () => {
+    const genuine = await signedComment("real");
+    const forged = { ...(await signedComment("real")), text: "forged by the relayer" };
+    const comments = await verifiedComments([toTopicMessage(genuine, 1), toTopicMessage(forged, 2)], token);
+    expect(comments.map(c => c.text)).toEqual(["real"]);
   });
 
   it("decodes topic messages for one token and skips garbage", async () => {

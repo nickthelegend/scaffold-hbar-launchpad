@@ -4,7 +4,7 @@ Briefing for coding agents (Claude Code, Cursor, Codex) working in this repo. Cl
 
 ## What this is
 
-A Scaffold-HBAR template for a **token launchpad**: `Launchpad.sol` creates keyless, fixed-supply HTS tokens, sells 80% on a bonding curve, and on reaching `graduationThreshold` seeds a **SaucerSwap V1** pool with the raised HBAR plus the remaining 20%, locking the LP tokens in the contract forever. The Next.js app lists launches, trades on the curve or on SaucerSwap after graduation, charts history from the **mirror node**, and stores comment threads on **HCS**.
+A Scaffold-HBAR template for a **token launchpad**: `Launchpad.sol` creates fixed-supply HTS tokens (no admin, supply or wipe key; one freeze key held by the contract to freeze the pool until graduation), sells 80% on a bonding curve, and on reaching `graduationThreshold` seeds a **SaucerSwap V1** pool with the raised HBAR plus the remaining 20%, locking the LP tokens in the contract forever. The Next.js app lists launches, trades on the curve or on SaucerSwap after graduation, charts history from the **mirror node**, and stores comment threads on **HCS**.
 
 - `packages/foundry`: contracts, deploy script, tests, demo script. Foundry only (no Hardhat package).
 - `packages/nextjs`: App Router frontend (RainbowKit, wagmi, viem, DaisyUI, React Query).
@@ -54,8 +54,8 @@ Before finishing any change, run `yarn foundry:test`, `yarn next:test`, `yarn ne
 2. **Curve constants are duplicated.** `TOTAL_SUPPLY`, `CURVE_SUPPLY`, `FEE_BPS`, `PRICE_SCALE` and the virtual-reserve formula exist in both `Launchpad.sol`/`BondingCurve.sol` **and** `utils/launchpad/curve.ts`. Change both, then run both test suites.
 3. **`LIQUIDITY_SUPPLY = CURVE_SUPPLY / 4`** is what makes `threshold/3` and `curveSupply/3` the right offsets (price continuity at graduation). If you change the split, re-derive the offsets and update `testFuzz_finalPriceMatchesPoolPrice`.
 4. **Prices are scaled by 1e18** (`PRICE_SCALE`). Unscaled per-token prices round to 0.
-5. **No admin surface.** Do not add owner-only functions that move LP tokens, mint, or change fees on live launches. Token creation passes an empty `tokenKeys` array on purpose.
-6. **State before interactions.** Every external entry point is `nonReentrant` and mutates storage before calling HTS, SaucerSwap or sending HBAR. Keep it that way.
+5. **No admin surface.** Do not add owner-only functions that move LP tokens, mint, or change fees on live launches. The token's only key is the freeze key held by the Launchpad; the contract must never freeze any account other than the launch's own pair, and only before graduation.
+6. **Reentrancy.** Every state-changing entry point is `nonReentrant`. `buy`/`sell` update curve state before moving tokens or HBAR, and `_graduate` marks the launch graduated before touching SaucerSwap. Keep both properties.
 7. **Secrets.** Never commit `.env`, `.env.local`, keystores or private keys. `HEDERA_OPERATOR_KEY` is server-only: never prefix it `NEXT_PUBLIC_` or read it in a client component.
 
 ## Hedera specifics to keep in mind

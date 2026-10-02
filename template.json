@@ -43,7 +43,7 @@
           "title": "Make it yours",
           "steps": [
             {
-              "label": "Run the contract tests (offline, HTS emulated)",
+              "label": "Run the contract tests (real SaucerSwap on a Hedera testnet fork)",
               "command": "{run:foundry:test}"
             },
             {

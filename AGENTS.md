@@ -62,7 +62,7 @@ Before finishing any change, run `yarn foundry:test`, `yarn next:test`, `yarn ne
 
 - **HTS from contracts** goes through the system contract at `0x167`. Token creation needs HBAR attached (`createFungibleToken{value: ...}`); the Launchpad forwards a $1.30 budget and refunds what HTS does not charge.
 - **USD fees.** SaucerSwap's `pairCreateFee()` is in tinycents. Convert with `IExchangeRate(0x168).tinycentsToTinybars` at execution time; never hardcode HBAR amounts for fees.
-- **Gas.** `createLaunch` uses ~7.4M gas, mostly SaucerSwap's `createPair`; HTS facade calls such as `approve` use ~730k. Hedera bills ≥ 80% of the gas limit, so do not pad limits generously. `eth_estimateGas` on Hashio simulates HTS correctly and is what the UI relies on.
+- **Gas.** `createLaunch` uses ~6.9M gas, mostly SaucerSwap's `createPair`; HTS facade calls such as `approve` use ~730k. Hedera bills ≥ 80% of the gas limit, so do not pad limits generously. Hashio's `eth_estimateGas` **cannot** simulate `createLaunch` (HTS creation of a token with a key returns a bogus `INSUFFICIENT_TX_FEE`), so the create page and `demo.js` send a fixed 7.5M limit with simulation disabled. Other calls use `eth_estimateGas`.
 - **Association.** A recipient must be associated or have free auto-association slots, otherwise HTS transfers revert. `useTokenAssociation` checks via the mirror node; `token.associate()` (HIP-719) fixes it.
 - **ERC-20 facade.** HTS tokens answer `IERC20` calls at their own address, so use `SafeERC20` and `forceApprove` as usual.
 - **Mirror node** log queries filtered by topic must cover ≤ 7 days; use `MirrorNodeClient.getLogs`, which windows and paginates. The mirror node lags consensus by a few seconds, so refetch after a short delay.

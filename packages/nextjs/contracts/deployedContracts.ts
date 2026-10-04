@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-hbar/contract";
 const deployedContracts = {
   296: {
     Launchpad: {
-      address: "0x1390ee0f0a81fe4a262aa0970d83186afcb50ba3",
+      address: "0x04085b490ebb91b8a3b80a32d8d7dcf9b2c12502",
       abi: [
         {
           type: "constructor",
@@ -29,10 +29,6 @@ const deployedContracts = {
             },
           ],
           stateMutability: "nonpayable",
-        },
-        {
-          type: "receive",
-          stateMutability: "payable",
         },
         {
           type: "function",
@@ -522,6 +518,19 @@ const deployedContracts = {
         },
         {
           type: "function",
+          name: "whbarWrapper",
+          inputs: [],
+          outputs: [
+            {
+              name: "",
+              type: "address",
+              internalType: "contract IWHBAR",
+            },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
           name: "withdrawFees",
           inputs: [],
           outputs: [],
@@ -785,17 +794,6 @@ const deployedContracts = {
         },
         {
           type: "error",
-          name: "UnexpectedHbarSender",
-          inputs: [
-            {
-              name: "sender",
-              type: "address",
-              internalType: "address",
-            },
-          ],
-        },
-        {
-          type: "error",
           name: "UnknownLaunch",
           inputs: [
             {
@@ -812,7 +810,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 41276173,
+      deployedOnBlock: 41310826,
     },
   },
 } as const;

@@ -13,7 +13,7 @@ npm create scaffold-hbar@latest -- --template nickthelegend/scaffold-hbar-launch
 | **Hedera services** | HTS (contract-created token, freeze key as an anti-sniping guard) · Exchange Rate system contract · HIP-719 association · HCS · Mirror Node REST |
 | **Ecosystem integration** | SaucerSwap V1: pool creation, liquidity seeding and locking, post-graduation swaps and quotes |
 | **Stack** | Foundry · Next.js App Router · RainbowKit/wagmi/viem · Yarn workspaces · Node ≥ 20.18.3 |
-| **Live on testnet** | Launchpad [`0.0.10831212`](https://hashscan.io/testnet/contract/0.0.10831212) · graduated token [`HCAT 0.0.10831221`](https://hashscan.io/testnet/token/0.0.10831221) · HCS topic [`0.0.10830947`](https://hashscan.io/testnet/topic/0.0.10830947) |
+| **Live on testnet** | Launchpads [`0.0.10844301`](https://hashscan.io/testnet/contract/0.0.10844301) (25 HBAR, shared) and [`0.0.10844300`](https://hashscan.io/testnet/contract/0.0.10844300) (100 HBAR) · graduated tokens HCAT [`0.0.10844336`](https://hashscan.io/testnet/token/0.0.10844336), HOUND [`0.0.10844376`](https://hashscan.io/testnet/token/0.0.10844376) · HCS topic [`0.0.10830947`](https://hashscan.io/testnet/topic/0.0.10830947) · 40+ real transactions in [Testnet proof](#testnet-proof) |
 | **Tested against** | the real SaucerSwap V1 contracts on a Hedera testnet fork: no protocol mocks |
 
 ---
@@ -69,7 +69,7 @@ cd my-hedera-dapp
 yarn next:dev
 ```
 
-Open http://localhost:3000. The frontend ships wired to the shared testnet Launchpad recorded in `packages/nextjs/contracts/deployedContracts.ts`, so you can launch, trade and graduate tokens immediately, without deploying anything. The shared deployment graduates at **1 HBAR**, so the whole lifecycle fits in a faucet drip. Your own deployments default to 100 HBAR.
+Open http://localhost:3000. The frontend ships wired to the shared testnet Launchpad recorded in `packages/nextjs/contracts/deployedContracts.ts`, so you can launch, trade and graduate tokens immediately, without deploying anything. The shared deployment graduates at **25 HBAR**, so the whole lifecycle fits in a few faucet drips; it already holds graduated and in-progress tokens to explore. Your own deployments default to 100 HBAR.
 
 **2. Launch a token.** Go to **Create**, enter a name and symbol and confirm. Launching costs about $3 in HBAR (HTS token creation plus SaucerSwap's $2 pool fee); the exact amount is quoted on the page and any excess is refunded.
 
@@ -226,7 +226,7 @@ Mainnet variants (`*_MAINNET_*`) exist for the RPC and mirror URLs.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `GRADUATION_THRESHOLD_HBAR` | `100` | HBAR a curve must raise before graduating. The shared testnet deployment uses 1, so the lifecycle is cheap to try. |
+| `GRADUATION_THRESHOLD_HBAR` | `100` | HBAR a curve must raise before graduating. The shared testnet deployment uses 25, so the lifecycle is cheap to try. |
 | `FEE_RECIPIENT` | deployer | Receives the 1% curve fee. |
 | `HEDERA_RPC_URL` | Hashio testnet | RPC for fork tests and the demo script. |
 | `DEMO_PRIVATE_KEY` | unset | Non-interactive signer for `yarn foundry:demo`. Never commit it. |
@@ -246,7 +246,7 @@ yarn next:hcs:create-topic
 
 ```bash
 yarn foundry:account:generate            # or foundry:account:import; fund it from the faucet
-yarn foundry:test                        # 30 tests, real SaucerSwap on a testnet fork
+yarn foundry:test                        # 33 tests, real SaucerSwap on a testnet fork
 yarn deploy --network hedera_testnet     # deploys Launchpad + regenerates deployedContracts.ts
 yarn foundry:demo --graduate             # optional: full lifecycle on testnet with HashScan links
 yarn next:dev
@@ -269,41 +269,94 @@ yarn lint && yarn next:check-types && yarn next:build
 | Address | What runs there in the fork | Source of truth |
 |---|---|---|
 | `0x167` HTS | [`hedera-forking`](https://github.com/hashgraph/hedera-forking)'s HTS emulator | Real token, balance and account state from the mirror node |
-| `0x168` exchange rate | [`LiveExchangeRate`](packages/foundry/test/utils/LiveExchangeRate.sol) | The network's current rate from `/network/exchangerate` |
+| `0x168` exchange rate | [`LiveExchangeRate`](packages/foundry/test/utils/LiveExchangeRate.sol) | The rate in force at the fork block, from `/network/exchangerate?timestamp=` |
 
-Getting real SaucerSwap to run in a fork required three adapters, each documented in [`test/utils/`](packages/foundry/test/utils):
+Getting real SaucerSwap to run in a fork required these adapters, each documented in [`test/utils/`](packages/foundry/test/utils):
 
-- [`HtsV1Compat`](packages/foundry/test/utils/HtsV1Compat.sol): SaucerSwap (2022) calls HTS through the **v1 ABI** (`uint32`/`uint64` amounts). The emulator only speaks v2, so v1 calls are re-dispatched with `delegatecall`, preserving the caller for supply-key checks.
+- [`HtsV1Compat`](packages/foundry/test/utils/HtsV1Compat.sol): SaucerSwap (2022) calls HTS through the **v1 ABI** (`uint32`/`uint64` amounts). The emulator only speaks v2, so v1 calls are re-dispatched with `delegatecall`, preserving the caller for supply-key checks. It also adds HTS **freeze / unfreeze** (checked against the token's freeze key), which the pinned emulator lacks; [`HtsContractKeyRouter`](packages/foundry/test/utils/HtsContractKeyRouter.sol) enforces `ACCOUNT_FROZEN_FOR_TOKEN` on both transfer paths.
 - [`HtsContractKeyRouter`](packages/foundry/test/utils/HtsContractKeyRouter.sol) and [`ContractKeys`](packages/foundry/test/utils/ContractKeys.sol): **contract keys**. WHBAR's supply key is the WHBAR contract, and SaucerSwap's fee account is keyed by its factory. The mirror node serves these keys protobuf-encoded, so they are verified against the real key bytes instead of being ignored.
 - [`ForkMirrorNode`](packages/foundry/test/utils/ForkMirrorNode.sol): contracts created inside the fork (the Launchpad, new pairs) are accounts on Hedera from birth, but the real mirror node has never seen them.
 - `ForkTestBase._useRealHtsToken`: Hashio now reports HTS token code as an EIP-7702 delegation (`0xef0100…0167`). Tokens the tests touch get the HIP-719 proxy the emulator expects.
 
-The suite needs network access (Hashio RPC and mirror node) and caches RPC responses for the pinned block. A full run takes about 3 minutes.
+The suite needs network access (Hashio RPC and mirror node) and caches RPC responses for the pinned block. A full run takes about 3 minutes: **33 Solidity tests** (29 fork integration + 4 curve fuzz properties). `yarn next:test` runs **31 Vitest tests**, including live mirror-node checks against the launches in [Testnet proof](#testnet-proof).
 
-What is covered: launch accounting and refunds, metadata validation, USD fee conversion at the live rate, quotes matching execution, slippage, allowances, round-trip fee loss, threshold overshoot refunds, graduation seeding and locking in the real pool, price continuity, **swapping a graduated token on SaucerSwap**, post-graduation lockout, a pool pre-seeded through SaucerSwap's own router, pagination, fee withdrawal, and a fuzz regression for the closing-buy rounding bug. [`BondingCurve.t.sol`](packages/foundry/test/BondingCurve.t.sol) fuzzes the pricing properties.
+What is covered: launch accounting and refunds, metadata validation, USD fee conversion at the live rate, quotes matching execution, slippage, allowances, round-trip fee loss, threshold overshoot refunds, graduation seeding and locking in the real pool, price continuity, **swapping a graduated token on SaucerSwap**, post-graduation lockout, the **pool freeze** (pre-seeding through SaucerSwap's router or a direct transfer reverts; WHBAR donations cannot block graduation), pagination, fee withdrawal, and a fuzz regression for the closing-buy rounding bug. [`BondingCurve.t.sol`](packages/foundry/test/BondingCurve.t.sol) fuzzes the pricing properties.
 
 The same lifecycle on the live network is `yarn foundry:demo --graduate`.
 
 ## Testnet proof
 
-The shared deployment the scaffolded frontend uses, with one token taken through the whole lifecycle on Hedera testnet:
+Everything below is real Hedera testnet activity against the **real SaucerSwap V1** deployment, on the current contract (pool-freeze guard included). Three independent wallets trade, plus one deliberately created **without auto-association slots** to exercise HIP-719. Every row links to HashScan.
 
-| Step | Evidence |
+### Deployments
+
+| | Graduation | Contract | Deploy tx |
+|---|---|---|---|
+| **Launchpad (shared, wired into the frontend)** | 25 HBAR | [`0.0.10844301`](https://hashscan.io/testnet/contract/0.0.10844301) · `0x04085b490EBB91B8A3B80a32D8D7dcF9B2c12502` | [0x54d0…8a54](https://hashscan.io/testnet/transaction/0x54d022a88cee40e60acc5df0c7ce59d2e8284e2e2ae7eb4e9222d8726f688a54) |
+| **Launchpad (template default economics)** | 100 HBAR | [`0.0.10844300`](https://hashscan.io/testnet/contract/0.0.10844300) · `0xdc8204B9D72D4f2fD15553d3e773436E4bc0705e` | [0x220d…81d8](https://hashscan.io/testnet/transaction/0x220d5ef5cc540583540de40f02426a450b015c5116d3815a17ee9ab0885381d8) |
+| HCS comments topic | — | [`0.0.10830947`](https://hashscan.io/testnet/topic/0.0.10830947) | relayer account `0.0.10829669` |
+
+### Tokens
+
+| Token | Launchpad | State | Links |
+|---|---|---|---|
+| **HCAT** Hedera Cat | 25 HBAR | Graduated, trading on SaucerSwap | [`0.0.10844336`](https://hashscan.io/testnet/token/0.0.10844336) · LP [`0.0.10844338`](https://hashscan.io/testnet/token/0.0.10844338) (locked) · [pair](https://hashscan.io/testnet/contract/0x8b4Bb3EC17EEd067eDc41E641148823c0795C7b9) · [app](https://web-production-aca4c.up.railway.app/token/0x0000000000000000000000000000000000a578b0) |
+| **HOUND** Hbar Hound | 100 HBAR | Graduated, trading on SaucerSwap | [`0.0.10844376`](https://hashscan.io/testnet/token/0.0.10844376) · LP [`0.0.10844378`](https://hashscan.io/testnet/token/0.0.10844378) (locked) · [pair](https://hashscan.io/testnet/contract/0x263DbC4245996f47f9139795A03dCf185AF73410) · [app](https://web-production-aca4c.up.railway.app/token/0x0000000000000000000000000000000000a578d8) |
+| **DEMO** Scaffold Demo | 25 HBAR | Graduated by `yarn foundry:demo --graduate` | [`0.0.10844400`](https://hashscan.io/testnet/token/0.0.10844400) · LP [`0.0.10844402`](https://hashscan.io/testnet/token/0.0.10844402) (locked) · [app](https://web-production-aca4c.up.railway.app/token/0x0000000000000000000000000000000000a578f0) |
+| **PUP** Saucer Pup | 25 HBAR | On the bonding curve | [`0.0.10844359`](https://hashscan.io/testnet/token/0.0.10844359) · [pair](https://hashscan.io/testnet/contract/0xC010b74794F780E6a7f06E9E7136f49A7b956832) · [app](https://web-production-aca4c.up.railway.app/token/0x0000000000000000000000000000000000a578c7) |
+| **OWL** Gossip Owl | 25 HBAR | On the bonding curve, **launched, bought and commented entirely through the UI** | [`0.0.10852769`](https://hashscan.io/testnet/token/0.0.10852769) · [app](https://web-production-aca4c.up.railway.app/token/0x0000000000000000000000000000000000a599A1) |
+
+### HCAT: the full lifecycle, three wallets
+
+| # | Step | Tx |
+|---|---|---|
+| 1 | **Launch.** `createLaunch` creates the HTS token from the contract (freeze key held by the Launchpad), creates the SaucerSwap pair through the factory (USD fee converted via `0x168`), associates the LP token and **freezes the pool** | [0xc9b3…ee09](https://hashscan.io/testnet/transaction/0xc9b3c8869fdbbc13a28dced82cdcb94e29ce55634515414f050635f960c9ee09) |
+| 2 | alice buys 6 HBAR on the curve | [0xa451…ed20](https://hashscan.io/testnet/transaction/0xa451e151253ef93f41621195f8861356408a6611e6da15ab950531f78328ed20) |
+| 3 | bob buys 8 HBAR on the curve | [0x74f6…dc32](https://hashscan.io/testnet/transaction/0x74f6852e48cc02b26c77c7a8b4ac418ba77219e00501dfb5931b3a8448d0dc32) |
+| 4 | alice grants the Launchpad an HTS allowance, then sells half back to the curve | [approve](https://hashscan.io/testnet/transaction/0x0ecfeac08315cde3ac0c4d7692251674ef164a8113cf0d539caefdb857b57e53) · [sell](https://hashscan.io/testnet/transaction/0xa32a13b60759df2d5778d9a0f1df26eeb5e2137fb4f9a2e9be1750f4d574f723) |
+| 5 | carol (0 auto-association slots) tries to buy → **reverts `TOKEN_NOT_ASSOCIATED_TO_ACCOUNT`** | [0xf8d2…9574](https://hashscan.io/testnet/transaction/0xf8d2da13fdced9112105debd4f6cface6c5b4837f2c6791173d2da52e4fb9574) ✗ |
+| 6 | carol calls `token.associate()` (**HIP-719**), then buys 2 HBAR | [associate](https://hashscan.io/testnet/transaction/0xc30ef467d08dc53874d87a45da84a09973bb35f0d0dfa279130ff77eb4d50b20) · [buy](https://hashscan.io/testnet/transaction/0x78f7be37b338a0c2d47664d764cebad816a0ddd6d9e53fc10ab834892a6f92d0) |
+| 7 | **Front-running attempt.** bob approves the router and calls SaucerSwap `addLiquidityETH` to pre-seed the pool → **reverts, `ACCOUNT_FROZEN_FOR_TOKEN`** | [approve](https://hashscan.io/testnet/transaction/0x89c7e0610ee5c208f533f9afd34a4903650cd605b4ecdf15d91dda8fb060d303) · [addLiquidityETH](https://hashscan.io/testnet/transaction/0x2e49fc0ce61ea121f3d3dff747da8ae53aed704fbdc9507ea4a79b72a5fa35a0) ✗ |
+| 8 | bob transfers tokens straight to the pair → **reverts, `ACCOUNT_FROZEN_FOR_TOKEN`** | [0xdd1b…a6ed](https://hashscan.io/testnet/transaction/0xdd1b709460bec6010475d1e31754c632e5348fc2e80ac3b89f8625f513eda6ed) ✗ |
+| 9 | **Graduate.** alice's buy crosses 25 HBAR, the overshoot is refunded, the pool is unfrozen, raised HBAR + 200M HCAT are minted into the pair, LP locked in the Launchpad | [0x3959…6b12](https://hashscan.io/testnet/transaction/0x3959a2e0988e83056dbbb0355b6ecd72f1b58492812a5e722bfef226035c6b12) |
+| 10 | bob buys 3 HBAR on SaucerSwap (`swapExactETHForTokens`) | [0xf982…d7b4](https://hashscan.io/testnet/transaction/0xf982e316843790787e4ccd89dddc9dfa3a35eb1dcce540ddf39ca0cced88d7b4) |
+| 11 | alice approves the router and sells 30% on SaucerSwap (`swapExactTokensForETH`) | [approve](https://hashscan.io/testnet/transaction/0x8a84229bcef9d36bac18fd18def0fbb7276e4ba67e9c86b24ccbe1b03551cd98) · [swap](https://hashscan.io/testnet/transaction/0xf7dd1d421301bdefbe7214bf1563dda2cbd72b0efede68b131b715b96661617b) |
+| 12 | alice and bob post wallet-signed comments through the **hosted** relayer → HCS messages #2, #3 | [#2](https://hashscan.io/testnet/transaction/0.0.10829669-1791044267-196341591) · [#3](https://hashscan.io/testnet/transaction/0.0.10829669-1791044267-650201416) |
+
+### HOUND: 100 HBAR graduation (template defaults)
+
+| Step | Tx |
 |---|---|
-| Launchpad deployed (graduation at 1 HBAR) | contract [`0.0.10831212`](https://hashscan.io/testnet/contract/0.0.10831212) · [deploy tx](https://hashscan.io/testnet/transaction/0x09dbe5c31e8f3c2d702b006b581b7e2b5ed406f3d306add9143c76f0bdfcacec) |
-| **Launch.** `createLaunch` creates the HTS token `HCAT` from the contract, creates its SaucerSwap pair through the factory (USD fee converted via `0x168`), associates the LP token, and refunds the unused HTS budget | [0x1b22…fd35](https://hashscan.io/testnet/transaction/0x1b2255778a8332000042b7735f170a1c15eab2fc2c982096c489b07458e7fd35) · token [`0.0.10831221`](https://hashscan.io/testnet/token/0.0.10831221) · pair [`0.0.10831222`](https://hashscan.io/testnet/contract/0.0.10831222) |
-| **Graduate.** A buy crosses the threshold; the overshoot is refunded; 1 HBAR plus 200M HCAT are deposited through SaucerSwap's router; 1.414e12 LP tokens are locked in the Launchpad | [0xc43f…c819](https://hashscan.io/testnet/transaction/0xc43f3969eedb4e5ecb674889eb537406b3901c8259eb96b702254a04cef6c819) · LP token [`0.0.10831223`](https://hashscan.io/testnet/token/0.0.10831223) |
-| **Trade on SaucerSwap.** `swapExactETHForTokens` against the new pool | [0x1e1a…fbe6](https://hashscan.io/testnet/transaction/0x1e1acba837fbcb828618fdf892bf22364a75d7acd6a803d2631d3ee361f7fbe6) |
-| **HCS comment.** A wallet-signed comment relayed to the comments topic | topic [`0.0.10830947`](https://hashscan.io/testnet/topic/0.0.10830947), message #1 |
+| Launch | [0x87e3…2aad](https://hashscan.io/testnet/transaction/0x87e30a1ab1f996ed1f7578d512a551ef744f9de96d7cc9b56e4d082a45942aad) |
+| alice buys 30 HBAR · bob buys 40 HBAR | [alice](https://hashscan.io/testnet/transaction/0x146a8dc6ebe471d0dd1cbf1096f2076b8000c87b85fd777a273143d28a886804) · [bob](https://hashscan.io/testnet/transaction/0xc0d461cc2ba350067e701cb3a497ec9c72ffed595adda1a9a8c309c150641571) |
+| Creator's buy crosses 100 HBAR → graduates into SaucerSwap, LP locked | [0xa327…79c0](https://hashscan.io/testnet/transaction/0xa32732117a0a2001b4bbb756a136fea32991a5afe77a9ef002ebcc6c017379c0) |
+| bob buys 5 HBAR on SaucerSwap | [0xe1e6…5387](https://hashscan.io/testnet/transaction/0xe1e6a51fd93dbe758452b16c4538a4086ddb16725cb4e7db5896e7ebb63e5387) |
 
-> **Note.** The shared deployment above was made just before the pool-freeze guard (see Security considerations) was added, so its HCAT pool was not frozen pre-graduation. The guard is exercised against real SaucerSwap in the fork tests (`test_createLaunch_freezesPoolUntilGraduation`, `test_frozenPool_cannotBeSeededBeforeGraduation`). `yarn deploy --network hedera_testnet` deploys the current contract.
+### PUP: still on the curve
 
-Curve `sell` with an HTS allowance, from an earlier development build (`0.0.10829745`): [buy](https://hashscan.io/testnet/transaction/0xec8809f667bd729aa3ea5518b7a79cfb713ca01f3ff24a9c13a435522675c06b) · [sell](https://hashscan.io/testnet/transaction/0x6bf0b18687f4463171f4d19aad0a299a03d2577738ccf4b390a298ae6830d670).
+[launch](https://hashscan.io/testnet/transaction/0x480228fe26b427cc8e61e68e010df0f40f0274c254c192449eb5bd240bdde104) · [alice buys 4](https://hashscan.io/testnet/transaction/0xab244ca125f46e563797b8feda5df95721e6ab97bb0fa6d4aca018f37b505e3d) · [bob buys 3](https://hashscan.io/testnet/transaction/0x1074f12a180ced50cd22daf71b49dc06398b930d76328a6acdb76f6a45c2d061) · [bob approves](https://hashscan.io/testnet/transaction/0xf9abfae0005f628c48fd7ace4723ab2e24d639bacdaa3a8e332a53bb7ac65f98) · [bob sells 40%](https://hashscan.io/testnet/transaction/0x0196df7311f4b2e04c96199a65adf366a1561b1211ec005be2d308cac40dbaab) · [HCS #4](https://hashscan.io/testnet/transaction/0.0.10829669-1791044314-735981740)
 
-Live testing also caught two real bugs, both fixed and covered by tests:
+### OWL: through the app UI
+
+Driven in the browser with the frontend's burner wallet (`0xAe59…8e4f`), no scripts:
+
+| Step | Tx |
+|---|---|
+| Create page → **Launch** (fixed 7.5M gas; shows the upfront HBAR the wallet needs) | [0xab7c…1844](https://hashscan.io/testnet/transaction/0xab7cfc94af17fea1fb721e16e0bd3558a74a103626a37a990e4b42385dcc1844) |
+| Curve panel → **Buy** 3 HBAR (quote 280.27M OWL, fee 0.03 HBAR) | [0xf044…08d9](https://hashscan.io/testnet/transaction/0xf0442fdd852327322980b3ce7b5ad924451214d4152e3c1f3f24b906dcd408d9) |
+| Thread → **Post**: `personal_sign` in the wallet, relayed to HCS as message #5, signature verified on read | topic [`0.0.10830947`](https://hashscan.io/testnet/topic/0.0.10830947) |
+
+### `yarn foundry:demo --graduate`
+
+The shipped demo script, run unmodified against the shared Launchpad: [launch](https://hashscan.io/testnet/transaction/0x68f84fd06e1ae86774df0bb27aec0764811438237d881535456b1dc60c90740e) · [buy](https://hashscan.io/testnet/transaction/0xdbe2ea98a36bdf044d20983561973a9a9b15709fbced60a6974fece3474536ea) · [approve](https://hashscan.io/testnet/transaction/0x926df016abb19ce7e0b37c7935de29b6a968e3fa4b1c6468c826386f0bfe78fb) · [sell](https://hashscan.io/testnet/transaction/0xf96b2435633362af726d1a653712b94ff0340240c13758161df6e347bfb6b68a) · [graduate](https://hashscan.io/testnet/transaction/0xd508dedb321f0a7014501c192a0b53b00a524d0b6c50b5b20d42f66881d27088) · [swap on SaucerSwap](https://hashscan.io/testnet/transaction/0x8b186d9eed3f41c9a4e13708c4bbb3507300a329ae32640ae3bd720bc28a7b59)
+
+### Bugs live testing caught
+
+All fixed and covered by tests:
 
 1. Flooring `threshold / 3` made the closing buy compute ~200 more tokens than were left, so graduation reverted. Output is now capped at `tokensLeft`.
 2. At small thresholds the price is below one tinybar per token, so integer prices read as 0. Prices are now 1e18-scaled.
+3. Hashio's `eth_estimateGas` cannot simulate `createLaunch` once the token has a key: it reports `INSUFFICIENT_TX_FEE` although the transaction uses ~6.9M gas and succeeds. The create page and demo script send a fixed 7.5M limit without simulation, and the create page shows the upfront HBAR the wallet must hold (value + gas reservation) before enabling **Launch**.
 
 ## Hedera gotchas this template handles
 
@@ -312,7 +365,7 @@ Live testing also caught two real bugs, both fixed and covered by tests:
 | **Two HBAR decimal conventions** | Inside the EVM, `msg.value` and balances are **tinybars (8 dp)**. A transaction's `value` over JSON-RPC is **weibars (18 dp)**. | Contract math is in tinybars. The UI converts with `tinybarsToWeibars()` only when setting `value` ([`units.ts`](packages/nextjs/utils/launchpad/units.ts)). |
 | **Sub-tinybar prices** | A token can be worth less than 1 tinybar, so integer prices round to 0. | `spotPrice` and UI prices are scaled by 1e18 (`PRICE_SCALE`). |
 | **USD-denominated fees** | SaucerSwap's `pairCreateFee` is in tinycents; HTS creation costs ~$1. | Converted on-chain through `0x168`; `quoteLaunchCost()` gives the UI an exact number, and the excess is refunded. |
-| **Expensive HTS operations** | `createPair` deploys a pair and creates and associates an HTS LP token: ~7M gas. `createLaunch` totals ~7.4M. | Gas comes from `eth_estimateGas` (Hashio simulates HTS correctly). Hedera bills at least 80% of the gas limit, so the demo script pads estimates by only 5%. |
+| **Expensive HTS operations** | `createPair` deploys a pair and creates and associates an HTS LP token. `createLaunch` totals ~6.9M gas. Hashio's `eth_estimateGas` cannot simulate HTS creation of a token with keys and wrongly returns `INSUFFICIENT_TX_FEE`. | `createLaunch` is sent with a fixed 7.5M limit and no simulation; the create page shows the upfront HBAR (value + limit × gas price) the wallet needs. Other calls use `eth_estimateGas`. Hedera bills at least 80% of the limit, so the demo script pads estimates by only 5%. |
 | **Association** | Accounts can only hold HTS tokens they are associated with, or have auto-association slots for. Wallet-created EVM accounts default to unlimited (HIP-904); others do not. | The contract associates itself with the LP token at launch. The UI checks the mirror node and offers `token.associate()` (HIP-719) when needed. |
 | **LP token unknown until the pair exists** | You cannot associate with a token that does not exist yet. | The pair is created at launch, so its LP token can be associated before graduation mints LP to the Launchpad. |
 | **Mirror node topic queries** | Log queries filtered by topic must span ≤ 7 days. | `MirrorNodeClient.getLogs` walks 7-day windows from each launch's on-chain `createdAt` and follows pagination. |

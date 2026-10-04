@@ -5,9 +5,9 @@ import type { Address } from "viem";
 import { describe, expect, it } from "vitest";
 
 /**
- * Integration tests against the live Hedera testnet mirror node, using the template's showcase launch:
- * HCAT was launched, graduated into SaucerSwap and swapped on the shared Launchpad deployment.
- * See README → Testnet proof.
+ * Integration tests against the live Hedera testnet mirror node. The first suite uses the original showcase launch
+ * (a single-buy graduation on a 1 HBAR Launchpad), whose exact amounts are known; the second uses the multi-wallet
+ * HCAT on the current shared Launchpad. See README → Testnet proof.
  */
 const mirror = new MirrorNodeClient("https://testnet.mirrornode.hedera.com");
 const LAUNCHPAD = "0x1390Ee0F0A81fE4A262aA0970d83186AFCb50bA3" as Address;
@@ -66,6 +66,29 @@ describe("MirrorNodeClient (live testnet)", { timeout: 30_000 }, () => {
     // A range spanning > 7 days must not trip the mirror node's topic-window limit.
     const trades = await mirror.getTrades(LAUNCHPAD, HCAT, CREATED_AT - 20 * 86_400);
     expect(trades.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("MirrorNodeClient on the current shared Launchpad (live testnet)", { timeout: 60_000 }, () => {
+  const SHARED_LAUNCHPAD = "0x04085b490EBB91B8A3B80a32D8D7dcF9B2c12502" as Address;
+  const HCAT_V2 = "0x0000000000000000000000000000000000a578b0" as Address;
+  const HCAT_V2_PAIR = "0x8b4Bb3EC17EEd067eDc41E641148823c0795C7b9" as Address;
+  const HCAT_V2_CREATED_AT = 1_791_044_091;
+
+  it("decodes a multi-wallet curve history: buys, sells, then graduation", async () => {
+    const trades = await mirror.getTrades(SHARED_LAUNCHPAD, HCAT_V2, HCAT_V2_CREATED_AT);
+    // alice, bob, carol buy; alice sells half; alice's buy graduates.
+    expect(trades.length).toBeGreaterThanOrEqual(5);
+    expect(new Set(trades.map(t => t.trader.toLowerCase())).size).toBeGreaterThanOrEqual(3);
+    expect(trades.some(t => !t.isBuy)).toBe(true);
+    // The graduating buy fills the curve to exactly 25 HBAR; any rounding dust left on it joins the pool.
+    expect(trades.at(-1)).toMatchObject({ isBuy: true, hbarRaised: 2_500_000_000n });
+
+    const graduation = await mirror.getGraduation(SHARED_LAUNCHPAD, HCAT_V2, HCAT_V2_CREATED_AT);
+    expect(graduation).not.toBeNull();
+    // Seeding, then a SaucerSwap buy and a SaucerSwap sell.
+    const syncs = await mirror.getPoolSyncs(HCAT_V2_PAIR, graduation!.timestamp);
+    expect(syncs.length).toBeGreaterThanOrEqual(3);
   });
 });
 

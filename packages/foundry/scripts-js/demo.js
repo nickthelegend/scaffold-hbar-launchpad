@@ -23,6 +23,11 @@ const RPC_URL = process.env.HEDERA_RPC_URL || "https://testnet.hashio.io/api";
 const HASHSCAN = "https://hashscan.io/testnet";
 const WEIBARS_PER_TINYBAR = ethers.BigNumber.from(10).pow(10);
 const GAS_HEADROOM_PERCENT = 105;
+/**
+ * The relay's eth_estimateGas cannot simulate HTS token creation with keys (it reports INSUFFICIENT_TX_FEE), so
+ * createLaunch is sent with a fixed limit; it uses ~6.9M on testnet.
+ */
+const CREATE_LAUNCH_GAS = 7_500_000;
 
 const LAUNCHPAD_ABI = [
   "function createLaunch(string,string,string,string) payable returns (address)",
@@ -113,8 +118,12 @@ async function send(label, contract, method, args, overrides = {}) {
     .mul(95)
     .div(100);
   const cap = affordable.lt(MAX_GAS) ? affordable : MAX_GAS;
-  const estimate = await contract.estimateGas[method](...args, overrides);
-  const padded = estimate.mul(GAS_HEADROOM_PERCENT).div(100);
+  // A fixed `gasLimit` override skips estimation (needed for createLaunch, see CREATE_LAUNCH_GAS).
+  const padded = overrides.gasLimit
+    ? ethers.BigNumber.from(overrides.gasLimit)
+    : (await contract.estimateGas[method](...args, overrides))
+        .mul(GAS_HEADROOM_PERCENT)
+        .div(100);
   const tx = await contract[method](...args, {
     ...overrides,
     gasPrice,
@@ -164,7 +173,7 @@ async function main() {
       "",
       "Created by `yarn foundry:demo` in the scaffold-hbar launchpad template.",
     ],
-    { value: toWeibars(launchCost) }
+    { value: toWeibars(launchCost), gasLimit: CREATE_LAUNCH_GAS }
   );
   const created = receipt.logs
     .map((log) => {

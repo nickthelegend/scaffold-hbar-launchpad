@@ -3,36 +3,58 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { NextPage } from "next";
-import { decodeEventLog } from "viem";
-import { useAccount } from "wagmi";
+import { decodeEventLog, formatEther } from "viem";
+import { useAccount, useBalance, useGasPrice } from "wagmi";
 import { TokenAvatar } from "~~/components/launchpad/TokenAvatar";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-hbar";
 import { launchpadEvents } from "~~/utils/launchpad/mirror";
 import { formatHbar, tinybarsToWeibars } from "~~/utils/launchpad/units";
 
 const LIMITS = { name: 64, symbol: 16, imageUri: 256, description: 512 } as const;
+/**
+ * `createLaunch` uses ~6.9M gas (HTS token creation, SaucerSwap's createPair, association, freeze). The relay's
+ * simulation cannot price HTS token creation with keys and wrongly reports INSUFFICIENT_TX_FEE, so this call skips
+ * simulation and sends a fixed limit. Hedera bills at least 80% of the limit, hence a tight margin.
+ */
+const CREATE_LAUNCH_GAS = 7_500_000n;
+/** Headroom on the quoted cost in case the HBAR/USD rate moves before consensus; the contract refunds the excess. */
+const LAUNCH_VALUE_BUFFER_PERCENT = 102n;
 
 const CreatePage: NextPage = () => {
   const router = useRouter();
   const { address } = useAccount();
   const [form, setForm] = useState({ name: "", symbol: "", imageUri: "", description: "" });
   const { data: launchCost } = useScaffoldReadContract({ contractName: "Launchpad", functionName: "quoteLaunchCost" });
-  const { writeContractAsync, isMining } = useScaffoldWriteContract({ contractName: "Launchpad" });
+  const { writeContractAsync, isMining } = useScaffoldWriteContract({
+    contractName: "Launchpad",
+    disableSimulate: true,
+  });
+  const { data: gasPrice } = useGasPrice();
+  // Polled so the form unlocks as soon as a top-up lands.
+  const { data: balance } = useBalance({ address, query: { refetchInterval: 5_000 } });
+
+  // Hedera charges a fixed gas price; sending it as a legacy price avoids wallets reserving 2× under EIP-1559.
+  const value = launchCost ? tinybarsToWeibars((launchCost * LAUNCH_VALUE_BUFFER_PERCENT) / 100n) : undefined;
+  const upfront = value !== undefined && gasPrice !== undefined ? value + CREATE_LAUNCH_GAS * gasPrice : undefined;
+  const insufficient = balance !== undefined && upfront !== undefined && balance.value < upfront;
 
   const update = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(prev => ({ ...prev, [field]: field === "symbol" ? e.target.value.toUpperCase() : e.target.value }));
 
-  const canSubmit = Boolean(address && form.name.trim() && form.symbol.trim() && launchCost && !isMining);
+  const canSubmit = Boolean(
+    address && form.name.trim() && form.symbol.trim() && value && gasPrice && !insufficient && !isMining,
+  );
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!launchCost) return;
+    if (!value || !gasPrice) return;
     await writeContractAsync(
       {
         functionName: "createLaunch",
         args: [form.name.trim(), form.symbol.trim(), form.imageUri.trim(), form.description.trim()],
-        // Small buffer in case the HBAR/USD rate moves before consensus; the contract refunds the excess.
-        value: tinybarsToWeibars((launchCost * 105n) / 100n),
+        value,
+        gas: CREATE_LAUNCH_GAS,
+        gasPrice,
       },
       {
         onBlockConfirmation: receipt => {
@@ -113,10 +135,26 @@ const CreatePage: NextPage = () => {
             HTS token creation (~$1) plus SaucerSwap&apos;s $2 pool fee, converted on-chain with Hedera&apos;s exchange
             rate system contract. Unused HBAR is refunded in the same transaction.
           </p>
+          {upfront !== undefined && (
+            <div className="flex justify-between text-xs mt-1">
+              <span className="text-base-content/60">Wallet needs upfront (incl. ~7M gas)</span>
+              <span className={insufficient ? "text-error font-semibold" : ""}>
+                ≈ {Number(formatEther(upfront)).toFixed(2)} HBAR
+              </span>
+            </div>
+          )}
         </div>
 
         <button type="submit" className="btn btn-primary btn-lg" disabled={!canSubmit}>
-          {isMining ? <span className="loading loading-spinner" /> : address ? "Launch" : "Connect a wallet"}
+          {isMining ? (
+            <span className="loading loading-spinner" />
+          ) : !address ? (
+            "Connect a wallet"
+          ) : insufficient ? (
+            "Not enough HBAR"
+          ) : (
+            "Launch"
+          )}
         </button>
       </form>
     </div>

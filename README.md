@@ -8,7 +8,7 @@ npm create scaffold-hbar@latest -- --template nickthelegend/scaffold-hbar-launch
 
 | | |
 |---|---|
-| **Live demo** | [web-production-aca4c.up.railway.app](https://web-production-aca4c.up.railway.app) (Hedera testnet) |
+| **Live demo** | [hbar-launchpad-wheat.vercel.app](https://hbar-launchpad-wheat.vercel.app) (Hedera testnet) |
 | **Demo video** | [82-second walkthrough](https://github.com/nickthelegend/scaffold-hbar-launchpad/releases/download/v1.0.0/hbar-launchpad-demo.mp4) |
 | **Hedera services** | HTS (contract-created token, freeze key as an anti-sniping guard) · Exchange Rate system contract · HIP-719 association · HCS · Mirror Node REST |
 | **Ecosystem integration** | SaucerSwap V1: pool creation, liquidity seeding and locking, post-graduation swaps and quotes |
@@ -254,7 +254,7 @@ yarn next:dev
 
 `Deploy.s.sol` picks the SaucerSwap V1 router for the chain (testnet `0.0.19264`, mainnet `0.0.3045981`) and reads the factory and WHBAR from it. A local Anvil chain is not supported, because it has no HTS or SaucerSwap; use testnet, or the forked test suite, for development.
 
-**Hosting the frontend.** It is a standard Next.js app, and [`railway.json`](railway.json) makes it one-click on Railway: create a service from your repo, add the env vars above (`HEDERA_OPERATOR_KEY` as a secret), and it builds with `yarn next:build` and serves with `yarn next:serve`. On Vercel, set the root directory to `packages/nextjs`.
+**Hosting the frontend.** It is a standard Next.js app; the live demo runs on **Vercel**. Import the repo (or `vercel link`), set the project's **Root Directory to `packages/nextjs`** so the install uses the workspace's root `yarn.lock`, add the env vars above (`HEDERA_OPERATOR_KEY` as a sensitive variable), and deploy with `vercel --prod`. The HCS relayer at `app/api/comments` runs as a serverless route. [`railway.json`](railway.json) also makes it one-click on Railway (`yarn next:build`, `yarn next:serve`).
 
 ## Testing
 
@@ -300,11 +300,11 @@ Everything below is real Hedera testnet activity against the **real SaucerSwap V
 
 | Token | Launchpad | State | Links |
 |---|---|---|---|
-| **HCAT** Hedera Cat | 25 HBAR | Graduated, trading on SaucerSwap | [`0.0.10844336`](https://hashscan.io/testnet/token/0.0.10844336) · LP [`0.0.10844338`](https://hashscan.io/testnet/token/0.0.10844338) (locked) · [pair](https://hashscan.io/testnet/contract/0x8b4Bb3EC17EEd067eDc41E641148823c0795C7b9) · [app](https://web-production-aca4c.up.railway.app/token/0x0000000000000000000000000000000000a578b0) |
+| **HCAT** Hedera Cat | 25 HBAR | Graduated, trading on SaucerSwap | [`0.0.10844336`](https://hashscan.io/testnet/token/0.0.10844336) · LP [`0.0.10844338`](https://hashscan.io/testnet/token/0.0.10844338) (locked) · [pair](https://hashscan.io/testnet/contract/0x8b4Bb3EC17EEd067eDc41E641148823c0795C7b9) · [app](https://hbar-launchpad-wheat.vercel.app/token/0x0000000000000000000000000000000000a578b0) |
 | **HOUND** Hbar Hound | 100 HBAR | Graduated, trading on SaucerSwap | [`0.0.10844376`](https://hashscan.io/testnet/token/0.0.10844376) · LP [`0.0.10844378`](https://hashscan.io/testnet/token/0.0.10844378) (locked) · [pair](https://hashscan.io/testnet/contract/0x263DbC4245996f47f9139795A03dCf185AF73410) · *(the hosted app is wired to the 25 HBAR Launchpad)* |
-| **DEMO** Scaffold Demo | 25 HBAR | Graduated by `yarn foundry:demo --graduate` | [`0.0.10844400`](https://hashscan.io/testnet/token/0.0.10844400) · LP [`0.0.10844402`](https://hashscan.io/testnet/token/0.0.10844402) (locked) · [app](https://web-production-aca4c.up.railway.app/token/0x0000000000000000000000000000000000a578f0) |
-| **PUP** Saucer Pup | 25 HBAR | On the bonding curve | [`0.0.10844359`](https://hashscan.io/testnet/token/0.0.10844359) · [pair](https://hashscan.io/testnet/contract/0xC010b74794F780E6a7f06E9E7136f49A7b956832) · [app](https://web-production-aca4c.up.railway.app/token/0x0000000000000000000000000000000000a578c7) |
-| **OWL** Gossip Owl | 25 HBAR | On the bonding curve, **launched, bought and commented entirely through the UI** | [`0.0.10852769`](https://hashscan.io/testnet/token/0.0.10852769) · [app](https://web-production-aca4c.up.railway.app/token/0x0000000000000000000000000000000000a599A1) |
+| **DEMO** Scaffold Demo | 25 HBAR | Graduated by `yarn foundry:demo --graduate` | [`0.0.10844400`](https://hashscan.io/testnet/token/0.0.10844400) · LP [`0.0.10844402`](https://hashscan.io/testnet/token/0.0.10844402) (locked) · [app](https://hbar-launchpad-wheat.vercel.app/token/0x0000000000000000000000000000000000a578f0) |
+| **PUP** Saucer Pup | 25 HBAR | On the bonding curve | [`0.0.10844359`](https://hashscan.io/testnet/token/0.0.10844359) · [pair](https://hashscan.io/testnet/contract/0xC010b74794F780E6a7f06E9E7136f49A7b956832) · [app](https://hbar-launchpad-wheat.vercel.app/token/0x0000000000000000000000000000000000a578c7) |
+| **OWL** Gossip Owl | 25 HBAR | On the bonding curve, **launched, bought and commented entirely through the UI** | [`0.0.10852769`](https://hashscan.io/testnet/token/0.0.10852769) · [app](https://hbar-launchpad-wheat.vercel.app/token/0x0000000000000000000000000000000000a599A1) |
 
 ### HCAT: the full lifecycle, three wallets
 

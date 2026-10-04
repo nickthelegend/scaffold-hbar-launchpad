@@ -2,9 +2,10 @@
 
 import { BackButton } from "./BackButton";
 import { ContractTabs } from "./ContractTabs";
-import { Address, Balance } from "@scaffold-hbar-ui/components";
+import { Address } from "@scaffold-hbar-ui/components";
 import { Address as AddressType } from "viem";
 import { hardhat } from "viem/chains";
+import { Balance } from "~~/components/scaffold-hbar/Balance";
 import { useTargetNetwork } from "~~/hooks/scaffold-hbar";
 
 export const AddressComponent = ({

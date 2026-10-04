@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "create-scaffold-hbar": {
     "requirements": {
-      "node": ">=20.18.3",
+      "node": ">=20.19.0",
       "forge": ">=1.0.0"
     },
     "capabilities": {

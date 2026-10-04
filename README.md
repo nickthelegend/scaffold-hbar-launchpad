@@ -12,7 +12,7 @@ npm create scaffold-hbar@latest -- --template nickthelegend/scaffold-hbar-launch
 | **Demo video** | [82-second walkthrough](https://github.com/nickthelegend/scaffold-hbar-launchpad/releases/download/v1.0.0/hbar-launchpad-demo.mp4) |
 | **Hedera services** | HTS (contract-created token, freeze key as an anti-sniping guard) · Exchange Rate system contract · HIP-719 association · HCS · Mirror Node REST |
 | **Ecosystem integration** | SaucerSwap V1: pool creation, liquidity seeding and locking, post-graduation swaps and quotes |
-| **Stack** | Foundry · Next.js App Router · RainbowKit/wagmi/viem · Yarn workspaces · Node ≥ 20.18.3 |
+| **Stack** | Foundry · Next.js App Router · RainbowKit/wagmi/viem · Yarn workspaces · Node ≥ 20.19 |
 | **Live on testnet** | Launchpads [`0.0.10844301`](https://hashscan.io/testnet/contract/0.0.10844301) (25 HBAR, shared) and [`0.0.10844300`](https://hashscan.io/testnet/contract/0.0.10844300) (100 HBAR) · graduated tokens HCAT [`0.0.10844336`](https://hashscan.io/testnet/token/0.0.10844336), HOUND [`0.0.10844376`](https://hashscan.io/testnet/token/0.0.10844376) · HCS topic [`0.0.10830947`](https://hashscan.io/testnet/topic/0.0.10830947) · 40+ real transactions in [Testnet proof](#testnet-proof) |
 | **Tested against** | the real SaucerSwap V1 contracts on a Hedera testnet fork: no protocol mocks |
 
@@ -55,7 +55,7 @@ This template does all of that, with tests, and a UI you can ship. Swap the bran
 
 | Tool | Version | Notes |
 |---|---|---|
-| Node.js | ≥ 20.18.3 | |
+| Node.js | ≥ 20.19 (or ≥ 22.12) | Vitest 3 / Vite 7 need `require(esm)` |
 | Yarn | via Corepack | `corepack enable` |
 | Foundry | **1.7.x** (1.8+ breaks Hashio forks) | `curl -L https://foundry.paradigm.xyz \| bash && foundryup -i v1.7.1` |
 | Git | any | `user.name` / `user.email` set (the CLI makes the first commit) |

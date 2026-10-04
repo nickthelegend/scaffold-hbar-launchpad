@@ -21,7 +21,7 @@ jobs:
       - name: Setup node env
         uses: actions/setup-node@v4
         with:
-          node-version: 20.18.3
+          node-version: 22
           cache: yarn
 
       # Pinned: forge 1.8+ sends an EIP-1898 block object in fork requests, which Hashio rejects

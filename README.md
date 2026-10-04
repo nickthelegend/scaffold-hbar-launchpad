@@ -9,7 +9,7 @@ npm create scaffold-hbar@latest -- --template nickthelegend/scaffold-hbar-launch
 | | |
 |---|---|
 | **Live demo** | [hbar-launchpad-wheat.vercel.app](https://hbar-launchpad-wheat.vercel.app) (Hedera testnet) |
-| **Demo video** | [82-second walkthrough](https://github.com/nickthelegend/scaffold-hbar-launchpad/releases/download/v1.0.0/hbar-launchpad-demo.mp4) |
+| **Demo video** | [watch (72 s)](https://hbar-launchpad-demo.vercel.app) · [mp4](https://hbar-launchpad-demo.vercel.app/hbar-launchpad-demo.mp4) |
 | **Hedera services** | HTS (contract-created token, freeze key as an anti-sniping guard) · Exchange Rate system contract · HIP-719 association · HCS · Mirror Node REST |
 | **Ecosystem integration** | SaucerSwap V1: pool creation, liquidity seeding and locking, post-graduation swaps and quotes |
 | **Stack** | Foundry · Next.js App Router · RainbowKit/wagmi/viem · Yarn workspaces · Node ≥ 20.19 |

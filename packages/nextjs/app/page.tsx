@@ -20,8 +20,8 @@ const steps = [
 ] as const;
 
 const Home: NextPage = () => {
-  const { threshold, isDeployed } = useLaunchpad();
-  const { data, isLoading } = useScaffoldReadContract({
+  const { threshold, isDeployed, isLoading: isCheckingDeployment } = useLaunchpad();
+  const { data } = useScaffoldReadContract({
     contractName: "Launchpad",
     functionName: "getLaunches",
     args: [0n, PAGE_SIZE],
@@ -65,11 +65,11 @@ const Home: NextPage = () => {
           )}
         </div>
 
-        {!isDeployed && !isLoading ? (
+        {!isCheckingDeployment && !isDeployed ? (
           <div className="alert">
             No Launchpad deployment found for this network. Run <code>yarn deploy --network hedera_testnet</code>.
           </div>
-        ) : isLoading || threshold === undefined ? (
+        ) : isCheckingDeployment || !data || threshold === undefined ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {[0, 1, 2].map(i => (
               <div key={i} className="h-48 rounded-2xl bg-base-200 animate-pulse" />

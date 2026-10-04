@@ -21,7 +21,7 @@ const SUPPLY_WHOLE_TOKENS = Number(TOTAL_SUPPLY / WHOLE_TOKEN);
  * Candlestick chart of market cap (HBAR) built from mirror-node history: bonding-curve trades
  * followed by SaucerSwap pool updates after graduation.
  */
-export const MarketCapChart = ({ points }: { points: PricePoint[] }) => {
+export const MarketCapChart = ({ points, isLoading = false }: { points: PricePoint[]; isLoading?: boolean }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -79,7 +79,7 @@ export const MarketCapChart = ({ points }: { points: PricePoint[] }) => {
         <div ref={containerRef} className="absolute inset-0" />
         {candles.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-base-content/50">
-            No trades yet — be the first.
+            {isLoading ? <span className="loading loading-spinner loading-md" /> : "No trades yet — be the first."}
           </div>
         )}
       </div>

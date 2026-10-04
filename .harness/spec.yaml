@@ -25,29 +25,36 @@ contract: .harness/acceptance-contract.json
 validator:
   enabled: true
 
-# Template invariants every generated change must keep.
+# Template invariants every generated change must keep. (template.json is consumed by create-scaffold-hbar and is
+# not present in a scaffolded project.)
 requiredFiles:
-  - template.json
   - packages/foundry/contracts/Launchpad.sol
   - packages/foundry/contracts/libraries/BondingCurve.sol
   - packages/nextjs/utils/launchpad/curve.ts
 
+# packages/foundry/.env is created (gitignored, no secrets) by the foundry postinstall, so it is not forbidden.
 forbiddenFiles:
   - .env
-  - packages/foundry/.env
   - packages/nextjs/.env
   - packages/nextjs/.env.local
 
 secretScan:
   failOnFiles:
     - .env
-    - packages/foundry/.env
     - packages/nextjs/.env.local
   patterns:
     - name: private-key-assignment
       pattern: "(PRIVATE_KEY|OPERATOR_KEY)\\s*=\\s*(0x)?[0-9a-fA-F]{32,}"
+    # A 32-byte hex literal next to a key-like identifier. A bare 32-byte literal is usually a hash (forge-std and
+    # OpenZeppelin fixtures in packages/foundry/lib are full of them), so it is not flagged on its own.
     - name: raw-hex-private-key
-      pattern: "['\"]0x[0-9a-fA-F]{64}['\"]"
+      pattern: "([Pp]rivate_?[Kk]ey|PRIVATE_KEY|[Ss]ecret_?[Kk]ey|SECRET_KEY|OPERATOR_KEY|[Oo]perator[Kk]ey|privateKeyToAccount|Wallet\\()[^\\n]{0,40}['\"]0x[0-9a-fA-F]{64}['\"]"
+      # Publicly documented dev keys only: Anvil account #2 signs test comments; the vendored hedera-forking
+      # submodule's own tests use Anvil account #0 and a Hedera local-node key.
+      allowIn:
+        - packages/nextjs/utils/launchpad/__tests__/comments.test.ts
+        - packages/foundry/lib/hedera-forking/test/plugin/hardhat-addresses.test.js
+        - packages/foundry/lib/hedera-forking/test/hts.e2e.js
 
 # Tier 3.5: an ephemeral funded testnet signer launches and trades through the burner wallet.
 # Needs ~45 HBAR per run (launch ≈ 33 HBAR incl. SaucerSwap's $2 pool fee). Export the operator vars first.

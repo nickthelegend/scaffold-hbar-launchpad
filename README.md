@@ -57,7 +57,7 @@ This template does all of that, with tests, and a UI you can ship. Swap the bran
 |---|---|---|
 | Node.js | ≥ 20.18.3 | |
 | Yarn | via Corepack | `corepack enable` |
-| Foundry | ≥ 1.0 | `curl -L https://foundry.paradigm.xyz \| bash && foundryup` |
+| Foundry | **1.7.x** (1.8+ breaks Hashio forks) | `curl -L https://foundry.paradigm.xyz \| bash && foundryup -i v1.7.1` |
 | Git | any | `user.name` / `user.email` set (the CLI makes the first commit) |
 | An EVM wallet on Hedera testnet | — | MetaMask, HashPack (EVM), Rabby… with testnet HBAR from the [portal faucet](https://portal.hedera.com/faucet) |
 
@@ -192,7 +192,7 @@ flowchart LR
     │   ├── script/Deploy.s.sol    # deploys Launchpad wired to SaucerSwap for the current chain
     │   ├── scripts-js/demo.js     # end-to-end lifecycle on testnet, prints HashScan links
     │   └── test/
-    │       ├── Launchpad.t.sol    # 26 integration tests vs real SaucerSwap on a testnet fork
+    │       ├── Launchpad.t.sol    # 29 integration tests vs real SaucerSwap on a testnet fork
     │       ├── BondingCurve.t.sol # pricing properties (fuzz)
     │       └── utils/             # fork wiring: HTS emulator adapters, live exchange rate
     └── nextjs/
@@ -397,7 +397,7 @@ This is a template, **not audited software**. Notable design points:
 ## AI-assisted development
 
 - [`AGENTS.md`](AGENTS.md) briefs coding agents (Claude Code, Cursor, Codex) on commands, layout, invariants and Hedera pitfalls. `CLAUDE.md` includes it.
-- [`.harness/`](.harness) holds the [Hedera Harness](https://github.com/hedera-dev/hedera-harness) recipe and validators used to verify this template: install and build gates, secret scanning, Playwright route smoke tests and an adversarial contract. Run `npx hedera-harness doctor` and then `npx hedera-harness run` to extend the template with a PRD of your own.
+- [`.harness/`](.harness) holds the [Hedera Harness](https://github.com/hedera-dev/hedera-harness) recipe and validators used to verify this template: install and build gates, secret scanning, Playwright route smoke tests and an adversarial contract. `hedera-harness` and `playwright` are root devDependencies, so run `yarn harness doctor`, `yarn harness validate` and then `yarn harness run` to extend the template with a PRD of your own. (Under plain `npx`, the Playwright gate cannot see the project's `playwright`; use `npx -p hedera-harness -p playwright hedera-harness doctor` instead.)
 - Hedera Skills (`npx skills add hedera-dev/hedera-skills`) are installed by the CLI by default.
 
 ## License

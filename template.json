@@ -59,7 +59,7 @@
               "command": "{run:foundry:demo} --graduate"
             },
             {
-              "text": "Optional: enable HCS comment threads with `{run:next:hcs:create-topic}` — see README → Comments."
+              "text": "Optional: enable HCS comment threads with `{run:next:hcs:create-topic}` — see README → Enabling comments."
             }
           ]
         }

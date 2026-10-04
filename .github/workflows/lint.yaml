@@ -24,13 +24,17 @@ jobs:
           node-version: 20.18.3
           cache: yarn
 
+      # Pinned: forge 1.8+ sends an EIP-1898 block object in fork requests, which Hashio rejects
+      # ("Expected 0x prefixed hexadecimal block number").
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
 
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Contract tests (HTS emulated offline)
+      - name: Contract tests (real SaucerSwap on a live testnet fork)
         run: yarn foundry:test
 
       - name: Contract lint

@@ -44,10 +44,12 @@
     "next:test": "yarn workspace @sh/nextjs test",
     "postinstall": "husky",
     "precommit": "lint-staged",
-    "test": "yarn foundry:test && yarn next:test"
+    "test": "yarn foundry:test && yarn next:test",
+    "harness": "hedera-harness"
   },
   "packageManager": "yarn@3.2.3",
   "devDependencies": {
+    "hedera-harness": "^1.2.2",
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10",
     "playwright": "^1.58.0"

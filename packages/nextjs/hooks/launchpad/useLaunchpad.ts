@@ -18,6 +18,8 @@ export function useLaunchpad() {
   return {
     launchpadAddress: contract?.address,
     isDeployed: !isLoading && Boolean(contract),
+    /** True until the deployment check has finished (including during server rendering). */
+    isLoading,
     chainId: targetNetwork.id,
     threshold,
     whbar,

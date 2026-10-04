@@ -11,6 +11,8 @@ A Scaffold-HBAR template for a **token launchpad**: `Launchpad.sol` creates fixe
 
 Use Yarn (`packageManager` in the root `package.json`). Run scripts from the repo root.
 
+Use **Foundry 1.7.x** (`foundryup -i v1.7.1`). Forge 1.8+ sends an EIP-1898 block object in fork requests, which Hashio rejects with `Expected 0x prefixed hexadecimal block number`, so every fork test fails in `setUp`. CI pins the same version.
+
 ## Commands
 
 ```bash
@@ -46,7 +48,7 @@ Before finishing any change, run `yarn foundry:test`, `yarn next:test`, `yarn ne
 | `packages/nextjs/app/` | `page.tsx` (grid), `create/`, `token/[address]/`, `api/comments/` (HCS relayer). |
 | `packages/nextjs/contracts/deployedContracts.ts` | **Generated** by `yarn deploy`. Do not hand-edit. |
 | `packages/nextjs/contracts/externalContracts.ts` | SaucerSwap router address + ABI subset per chain. |
-| `.harness/` | Hedera Harness recipe and validators. |
+| `.harness/` | Hedera Harness recipe and validators. Run with `yarn harness doctor` / `yarn harness validate`. |
 
 ## Invariants: do not break these
 

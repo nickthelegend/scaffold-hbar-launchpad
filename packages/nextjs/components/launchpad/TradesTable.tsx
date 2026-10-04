@@ -3,10 +3,17 @@ import { HashscanLink } from "./HashscanLink";
 import type { TradeEvent } from "~~/utils/launchpad/mirror";
 import { formatHbar, formatTokens } from "~~/utils/launchpad/units";
 
-export const TradesTable = ({ trades, symbol }: { trades: TradeEvent[]; symbol: string }) => (
+/** `trades` is undefined while the history is still loading from the mirror node. */
+export const TradesTable = ({ trades, symbol }: { trades: TradeEvent[] | undefined; symbol: string }) => (
   <div className="bg-base-100 rounded-2xl border border-base-300 p-4">
     <h3 className="font-bold m-0 mb-3">Curve trades</h3>
-    {trades.length === 0 ? (
+    {trades === undefined ? (
+      <div className="flex flex-col gap-2">
+        {[0, 1, 2].map(i => (
+          <div key={i} className="h-6 rounded bg-base-200 animate-pulse" />
+        ))}
+      </div>
+    ) : trades.length === 0 ? (
       <p className="text-sm text-base-content/50 m-0">No trades yet.</p>
     ) : (
       <div className="overflow-x-auto">

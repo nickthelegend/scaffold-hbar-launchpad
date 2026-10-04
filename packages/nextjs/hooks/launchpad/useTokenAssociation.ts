@@ -1,8 +1,9 @@
 import { useLaunchpad } from "./useLaunchpad";
 import { useQuery } from "@tanstack/react-query";
 import type { Address } from "viem";
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { useTransactor } from "~~/hooks/scaffold-hbar";
+import { hasOnChainActivity } from "~~/hooks/scaffold-hbar/useHederaAccountId";
 import { htsTokenAbi } from "~~/utils/launchpad/htsToken";
 
 /**
@@ -16,10 +17,13 @@ export function useTokenAssociation(token: Address | undefined) {
   const { chainId, mirror } = useLaunchpad();
   const { writeContractAsync, isPending } = useWriteContract();
   const transactor = useTransactor();
+  const publicClient = usePublicClient({ chainId });
 
   const status = useQuery({
     queryKey: ["association", chainId, account, token],
-    queryFn: () => mirror.getAssociationStatus(account!, token!),
+    // A brand-new address has no Hedera account yet (it is created by the first HBAR it receives): skip the lookup.
+    queryFn: async () =>
+      (await hasOnChainActivity(publicClient, account!)) ? mirror.getAssociationStatus(account!, token!) : null,
     enabled: Boolean(account && token),
   });
 

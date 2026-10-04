@@ -5,7 +5,7 @@
   "forbiddenCommands": ["npm install", "npm run", "pnpm install", "pnpm run"],
   "commands": [
     { "name": "install", "command": "yarn install", "timeoutMs": 600000, "purpose": "Install workspace dependencies." },
-    { "name": "contract-tests", "command": "yarn foundry:test", "timeoutMs": 600000, "purpose": "Launchpad + bonding-curve tests with the offline HTS emulator." },
+    { "name": "contract-tests", "command": "yarn foundry:test", "timeoutMs": 600000, "purpose": "Launchpad tests against real SaucerSwap on a live Hedera testnet fork (HTS emulated from mirror-node state), plus bonding-curve fuzzing." },
     { "name": "contract-lint", "command": "yarn foundry:lint", "timeoutMs": 180000, "purpose": "forge fmt --check and prettier on scripts." },
     { "name": "frontend-tests", "command": "yarn next:test", "timeoutMs": 300000, "purpose": "Vitest: curve maths, candles, mirror client, comment signing." },
     { "name": "frontend-lint", "command": "yarn next:lint --max-warnings=0", "timeoutMs": 300000, "purpose": "ESLint (next/core-web-vitals + prettier)." },

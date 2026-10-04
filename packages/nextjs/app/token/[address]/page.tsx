@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { NextPage } from "next";
-import { type Address, isAddress } from "viem";
+import { type Address, BaseError, ContractFunctionRevertedError, isAddress } from "viem";
 import { AccountLabel } from "~~/components/launchpad/AccountLabel";
 import { CommentsThread } from "~~/components/launchpad/CommentsThread";
 import { CurveTradePanel } from "~~/components/launchpad/CurveTradePanel";
@@ -22,6 +22,13 @@ import { hederaNetwork } from "~~/utils/launchpad/hashscan";
 import { toEntityId } from "~~/utils/launchpad/mirror";
 import { formatHbar } from "~~/utils/launchpad/units";
 
+/** True only for the contract's definitive `UnknownLaunch` revert, not for transient RPC failures. */
+const isUnknownLaunch = (error: Error | null) => {
+  if (!(error instanceof BaseError)) return false;
+  const revert = error.walk(e => e instanceof ContractFunctionRevertedError);
+  return revert instanceof ContractFunctionRevertedError && revert.data?.errorName === "UnknownLaunch";
+};
+
 /** The mirror node trails consensus by a few seconds. */
 const MIRROR_LAG_MS = 4_000;
 
@@ -34,12 +41,18 @@ const TokenPage: NextPage = () => {
     data: launch,
     error,
     refetch: refetchLaunch,
-  } = useScaffoldReadContract({ contractName: "Launchpad", functionName: "getLaunch", args: [token] });
+  } = useScaffoldReadContract({
+    contractName: "Launchpad",
+    functionName: "getLaunch",
+    args: [token],
+    // The hook refetches every block; without this, retries keep a revert from ever surfacing as an error.
+    query: { retry: false },
+  });
   const { data: metadata } = useLaunchMetadata(token, launch?.createdAt);
   const activity = useLaunchActivity(token, launch);
 
   // Only a definitive `UnknownLaunch` revert means "not found"; transient RPC errors keep the page loading.
-  if (!token || error?.message.includes("UnknownLaunch")) {
+  if (!token || isUnknownLaunch(error)) {
     return (
       <div className="max-w-xl mx-auto px-5 py-16 text-center">
         <h1 className="text-2xl font-bold">Launch not found</h1>

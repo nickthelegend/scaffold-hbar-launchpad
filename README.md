@@ -278,7 +278,7 @@ Getting real SaucerSwap to run in a fork required these adapters, each documente
 - [`ForkMirrorNode`](packages/foundry/test/utils/ForkMirrorNode.sol): contracts created inside the fork (the Launchpad, new pairs) are accounts on Hedera from birth, but the real mirror node has never seen them.
 - `ForkTestBase._useRealHtsToken`: Hashio now reports HTS token code as an EIP-7702 delegation (`0xef0100…0167`). Tokens the tests touch get the HIP-719 proxy the emulator expects.
 
-The suite needs network access (Hashio RPC and mirror node) and caches RPC responses for the pinned block. A full run takes about 3 minutes: **33 Solidity tests** (29 fork integration + 4 curve fuzz properties). `yarn next:test` runs **31 Vitest tests**, including live mirror-node checks against the launches in [Testnet proof](#testnet-proof).
+The suite needs network access (Hashio RPC and mirror node) and caches RPC responses for the pinned block. A full run takes about 3 minutes: **33 Solidity tests** (29 fork integration + 4 curve fuzz properties). `yarn next:test` runs **32 Vitest tests**, including live mirror-node checks against the launches in [Testnet proof](#testnet-proof).
 
 What is covered: launch accounting and refunds, metadata validation, USD fee conversion at the live rate, quotes matching execution, slippage, allowances, round-trip fee loss, threshold overshoot refunds, graduation seeding and locking in the real pool, price continuity, **swapping a graduated token on SaucerSwap**, post-graduation lockout, the **pool freeze** (pre-seeding through SaucerSwap's router or a direct transfer reverts; WHBAR donations cannot block graduation), pagination, fee withdrawal, and a fuzz regression for the closing-buy rounding bug. [`BondingCurve.t.sol`](packages/foundry/test/BondingCurve.t.sol) fuzzes the pricing properties.
 
@@ -357,6 +357,7 @@ All fixed and covered by tests:
 1. Flooring `threshold / 3` made the closing buy compute ~200 more tokens than were left, so graduation reverted. Output is now capped at `tokensLeft`.
 2. At small thresholds the price is below one tinybar per token, so integer prices read as 0. Prices are now 1e18-scaled.
 3. Hashio's `eth_estimateGas` cannot simulate `createLaunch` once the token has a key: it reports `INSUFFICIENT_TX_FEE` although the transaction uses ~6.9M gas and succeeds. The create page and demo script send a fixed 7.5M limit without simulation, and the create page shows the upfront HBAR the wallet must hold (value + gas reservation) before enabling **Launch**.
+4. On Hedera, `block.timestamp` is the start of the ~2 s block, so a launch's `LaunchCreated` log can reach consensus seconds after the `createdAt` the contract stores. A one-second mirror-node window missed HCAT's metadata; the lookup now uses a 60 s window filtered by the token topic, with a live regression test.
 
 ## Hedera gotchas this template handles
 

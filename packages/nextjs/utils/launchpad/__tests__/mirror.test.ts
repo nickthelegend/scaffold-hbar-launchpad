@@ -75,6 +75,12 @@ describe("MirrorNodeClient on the current shared Launchpad (live testnet)", { ti
   const HCAT_V2_PAIR = "0x8b4Bb3EC17EEd067eDc41E641148823c0795C7b9" as Address;
   const HCAT_V2_CREATED_AT = 1_791_044_091;
 
+  it("finds launch metadata when consensus lands seconds after block.timestamp", async () => {
+    // Regression: HCAT's createdAt (block start) is 2 s before its LaunchCreated log.
+    const metadata = await mirror.getLaunchMetadata(SHARED_LAUNCHPAD, HCAT_V2, HCAT_V2_CREATED_AT);
+    expect(metadata).toMatchObject({ name: "Hedera Cat", symbol: "HCAT" });
+  });
+
   it("decodes a multi-wallet curve history: buys, sells, then graduation", async () => {
     const trades = await mirror.getTrades(SHARED_LAUNCHPAD, HCAT_V2, HCAT_V2_CREATED_AT);
     // alice, bob, carol buy; alice sells half; alice's buy graduates.

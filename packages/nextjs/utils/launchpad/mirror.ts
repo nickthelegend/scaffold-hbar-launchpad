@@ -79,6 +79,9 @@ export class MirrorNodeError extends Error {
   }
 }
 
+/** How far after a launch's `block.timestamp` its LaunchCreated log may land (blocks span ~2 s). */
+const LAUNCH_LOG_WINDOW_SECONDS = 60;
+
 export class MirrorNodeClient {
   constructor(
     private readonly baseUrl: string,
@@ -90,12 +93,13 @@ export class MirrorNodeClient {
   }
 
   async getLaunchMetadata(launchpad: Address, token: Address, createdAt: number): Promise<LaunchMetadata | null> {
-    // `createdAt` is the consensus timestamp (seconds) of the launch, so a one-second window is exact.
+    // `createdAt` is `block.timestamp`, which on Hedera is the start of the ~2 s block, so the launch's consensus
+    // timestamp can be a few seconds later. The token topic makes a wider window exact.
     const logs = await this.getLogs(launchpad, {
       topic0: LAUNCH_CREATED_TOPIC,
       topic1: addressTopic(token),
       from: createdAt,
-      to: createdAt + 1,
+      to: createdAt + LAUNCH_LOG_WINDOW_SECONDS,
     });
     if (logs.length === 0) return null;
     const { args } = decodeEventLog({ abi: launchpadEvents, eventName: "LaunchCreated", ...toDecodable(logs[0]) });

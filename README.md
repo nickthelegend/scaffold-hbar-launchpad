@@ -305,6 +305,7 @@ Everything below is real Hedera testnet activity against the **real SaucerSwap V
 | **DEMO** Scaffold Demo | 25 HBAR | Graduated by `yarn foundry:demo --graduate` | [`0.0.10844400`](https://hashscan.io/testnet/token/0.0.10844400) · LP [`0.0.10844402`](https://hashscan.io/testnet/token/0.0.10844402) (locked) · [app](https://hbar-launchpad-wheat.vercel.app/token/0x0000000000000000000000000000000000a578f0) |
 | **PUP** Saucer Pup | 25 HBAR | On the bonding curve | [`0.0.10844359`](https://hashscan.io/testnet/token/0.0.10844359) · [pair](https://hashscan.io/testnet/contract/0xC010b74794F780E6a7f06E9E7136f49A7b956832) · [app](https://hbar-launchpad-wheat.vercel.app/token/0x0000000000000000000000000000000000a578c7) |
 | **OWL** Gossip Owl | 25 HBAR | On the bonding curve, **launched, bought and commented entirely through the UI** | [`0.0.10852769`](https://hashscan.io/testnet/token/0.0.10852769) · [app](https://hbar-launchpad-wheat.vercel.app/token/0x0000000000000000000000000000000000a599A1) |
+| **PRB** Probe | 25 HBAR | On the bonding curve, untraded: the post-deploy smoke-test launch (the shared Launchpad's first), sent with a fixed gas limit while diagnosing Hashio's `createLaunch` estimate bug (bug 3 in [Bugs live testing caught](#bugs-live-testing-caught)) | [`0.0.10844326`](https://hashscan.io/testnet/token/0.0.10844326) · [app](https://hbar-launchpad-wheat.vercel.app/token/0x0000000000000000000000000000000000a578a6) |
 
 ### HCAT: the full lifecycle, three wallets
 
